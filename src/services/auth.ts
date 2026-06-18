@@ -9,8 +9,10 @@ export interface AuthResponse {
 export const authService = {
   login: async (username: string, password: string): Promise<AuthResponse> => {
     try {
-      // Supabase uses email/password. We'll map username to a fake email format
-      const email = `${username}@gpib.org`;
+      console.log('[DEBUG] Memulai login untuk:', username);
+      // If it looks like an email, use it directly. Otherwise, map to the legacy format.
+      const email = username.includes('@') ? username : `${username}@imkksa.org`;
+      console.log('[DEBUG] Target email Supabase:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -18,13 +20,14 @@ export const authService = {
       });
 
       if (error) {
+        console.error('[DEBUG] Supabase Auth Error:', error.message, '| Code:', error.status);
         return { 
           success: false, 
-          message: 'Username atau Password salah.' 
+          message: `Login Gagal: ${error.message}` 
         };
       }
 
-      localStorage.setItem('isGPBAdmin', 'true');
+      localStorage.setItem('isIMKKSAAdmin', 'true');
       localStorage.setItem('adminToken', data.session?.access_token || 'true');
       return { 
         success: true, 
@@ -45,11 +48,11 @@ export const authService = {
     } catch (err) {
       console.error(err);
     }
-    localStorage.removeItem('isGPBAdmin');
+    localStorage.removeItem('isIMKKSAAdmin');
     localStorage.removeItem('adminToken');
   },
   
   isAuthenticated: (): boolean => {
-    return localStorage.getItem('isGPBAdmin') === 'true';
+    return localStorage.getItem('isIMKKSAAdmin') === 'true';
   }
 };

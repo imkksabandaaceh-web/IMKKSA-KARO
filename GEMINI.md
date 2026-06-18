@@ -1,7 +1,7 @@
-# Proyek: Welcome-GPIB
+# Proyek: KARO
 
 ## Deskripsi
-Aplikasi web untuk informasi jemaat GPIB Banda Aceh, dibangun menggunakan React + Vite + TypeScript.
+Aplikasi web untuk informasi jemaat IMKKSA Banda Aceh sekitar, dibangun menggunakan React + Vite + TypeScript.
 
 ## Status Terakhir
 - **Frontend:** Menggunakan React 19 dan Vite 8.

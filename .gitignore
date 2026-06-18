@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 
 .vercel
-website-gpib-banda-aceh-*.json
+website-imkksa-banda-aceh-sekitar-*.json
+.aider*
+.env

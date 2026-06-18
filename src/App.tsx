@@ -4,14 +4,10 @@ import LoginForm from './components/LoginForm'
 import { authService } from './services/auth'
 import AdminDashboard from './components/AdminDashboard'
 import { compressImage } from './utils/imageUtils'
-import DownloadProposal from './components/DownloadProposal'
-import { supabase, type SupabaseProposal } from './services/supabase'
 
 
 // Types
-type Tab = 'Beranda' | 'Jadwal Ibadah' | 'Organisasi Gereja' | 'Data Umat' | 'Download' | 'Login' 
-  | 'PA' | 'PT' | 'GP' | 'PKB' | 'PKP' 
-  | 'GermasaLH' | 'PG' | 'Inforkom-Litbang';
+type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Data Anggota' | 'Login';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -53,54 +49,18 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnXm-7uc82ZXbcqLVp6
 
 const DEFAULT_CONTENT: FullContent = {
   settings: {
-    logo: "/LOGO_GPIB.jpg",
-    title: "GPIB BANDA ACEH",
+    logo: "/LOGO_KARO.jpg",
+    title: "IMKKSA Banda Aceh Sekitar",
     berandaPdf: ""
   },
   pages: {
     'Beranda': {
-      title: 'Selamat Datang di GPIB Banda Aceh',
-      content: '<p>Membangun jemaat yang misioner, inklusif, dan transformatif di tengah masyarakat Banda Aceh.</p><p>GPIB Banda Aceh hadir untuk menjadi berkat bagi sesama dengan semangat pelayanan dan kasih Kristus.</p>'
+      title: 'Selamat Datang di IMKKSA Banda Aceh Sekitar',
+      content: '<p>Membangun kebersamaan dan kekeluargaan di tengah masyarakat Banda Aceh Sekitar.</p>'
     },
-    'Jadwal Ibadah': {
-      title: 'Jadwal Ibadah Mingguan',
-      content: '<p><strong>Ibadah Hari Minggu:</strong> 09.00 WIB<br><strong>Ibadah Keluarga:</strong> Rabu, 19.30 WIB<br><strong>Ibadah Pelkat PA/PT:</strong> Sabtu, 16.00 WIB</p>'
-    },
-    'Organisasi Gereja': {
-      title: 'Struktur Organisasi & Majelis',
-      content: '<p>Informasi mengenai struktur organisasi Majelis Jemaat, Pelayanan Kategorial (Pelkat), dan Komisi-Komisi di GPIB Banda Aceh.</p>'
-    },
-    'PA': {
-      title: 'Pelayanan Anak (PA)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Melaksanakan pelayanan kategorial kepada anak-anak jemaat dalam rentang usia sekolah minggu (0-12 tahun).</p><p><strong>Fungsi:</strong><br>1. Menyelenggarakan Ibadah Hari Minggu Pelayanan Anak (IHMPA).<br>2. Membina iman anak melalui pengajaran Alkitab yang kreatif dan kontekstual.<br>3. Mengembangkan potensi dan bakat anak dalam lingkungan gerejawi.</p>'
-    },
-    'PT': {
-      title: 'Pelayanan Taruna (PT)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Melayani dan membina kaum taruna atau remaja jemaat (usia 13-17 tahun).</p><p><strong>Fungsi:</strong><br>1. Menyelenggarakan Ibadah Hari Minggu Pelayanan Taruna (IHMPT).<br>2. Mendampingi remaja dalam masa transisi mencari jati diri dengan nilai-nilai Kristiani.<br>3. Membangun persekutuan yang akrab di antara taruna.</p>'
-    },
-    'GP': {
-      title: 'Gerakan Pemuda (GP)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Menghimpun dan melayani pemuda-pemudi gereja (usia 18-35 tahun) untuk terlibat aktif dalam misi gereja.</p><p><strong>Fungsi:</strong><br>1. Wadah pembinaan kepemimpinan dan spiritualitas pemuda.<br>2. Menggerakkan pemuda dalam berbagai aksi pelayanan kasih dan kemasyarakatan.<br>3. Menjadi garda terdepan dalam inovasi dan kegiatan kreatif gereja.</p>'
-    },
-    'PKP': {
-      title: 'Persekutuan Kaum Perempuan (PKP)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Melaksanakan pelayanan dan pembinaan kepada kaum perempuan/ibu di jemaat.</p><p><strong>Fungsi:</strong><br>1. Meningkatkan kualitas iman dan peran perempuan dalam keluarga dan gereja.<br>2. Menyelenggarakan persekutuan doa dan studi Alkitab khusus kaum perempuan.<br>3. Melaksanakan kegiatan pemberdayaan ekonomi dan sosial.</p>'
-    },
-    'PKB': {
-      title: 'Persekutuan Kaum Bapak (PKB)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Melaksanakan pelayanan dan pembinaan kepada kaum bapak/pria di jemaat.</p><p><strong>Fungsi:</strong><br>1. Menguatkan peran bapak sebagai imam dalam keluarga Kristen.<br>2. Membangun persekutuan bapak yang solider dan bertanggung jawab terhadap pelayanan gereja.<br>3. Menyelenggarakan kegiatan yang mendukung pertumbuhan iman dan tanggung jawab profesi.</p>'
-    },
-    'GermasaLH': {
-      title: 'Komisi Gereja, Masyarakat, Agama dan Lingkungan Hidup (GermasaLH)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Menangani urusan hubungan gereja dengan masyarakat, antarumat beragama, serta kelestarian lingkungan hidup.</p><p><strong>Fungsi:</strong><br>1. Membangun dialog dan kerjasama oikumenis serta antariman di Banda Aceh.<br>2. Melaksanakan aksi sosial dan advokasi terhadap isu-isu kemasyarakatan.<br>3. Mengedukasi jemaat dalam upaya pelestarian lingkungan hidup.</p>'
-    },
-    'PG': {
-      title: 'Komisi Pembangunan Gereja (PG)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Bertanggung jawab atas perencanaan, pelaksanaan, dan pengawasan pembangunan serta pemeliharaan sarana prasarana gereja.</p><p><strong>Fungsi:</strong><br>1. Menyusun rencana induk pembangunan fisik gereja.<br>2. Mengelola proses renovasi dan perawatan gedung serta aset gereja.<br>3. Memastikan ketersediaan fasilitas yang representatif untuk ibadah dan pelayanan.</p>'
-    },
-    'Inforkom-Litbang': {
-      title: 'Komisi Informasi, Organisasi, Komunikasi, Penelitian dan Pengembangan (Inforkom-Litbang)',
-      content: '<p><strong>Tugas Pokok:</strong><br>Mengelola sistem informasi, komunikasi publik, tata organisasi, serta melakukan penelitian dan pengembangan jemaat.</p><p><strong>Fungsi:</strong><br>1. Mengelola media komunikasi gereja (website, media sosial, warta jemaat).<br>2. Melakukan pendataan dan pengolahan data umat secara digital.<br>3. Melakukan kajian dan evaluasi program kerja untuk pengembangan kualitas jemaat ke depan.</p>'
+    'Jadwal Keluarga': {
+      title: 'Jadwal Pertemuan Keluarga',
+      content: '<p>Informasi mengenai jadwal pertemuan rutin dan kegiatan kekeluargaan IMKKSA Banda Aceh Sekitar.</p>'
     }
   },
   umat: [],
@@ -114,17 +74,23 @@ function App() {
   })
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
   const [siteContent, setSiteContent] = useState<FullContent>(() => {
-    const saved = localStorage.getItem('gpibSiteContent')
+    const saved = localStorage.getItem('imkksaSiteContent')
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
+        // Migration logic for old tab names
+        const migratedPages = parsed.pages || {};
+        if (migratedPages['Jadwal Ibadah']) {
+          migratedPages['Jadwal Keluarga'] = migratedPages['Jadwal Ibadah'];
+          delete migratedPages['Jadwal Ibadah'];
+        }
+        
         return {
           ...DEFAULT_CONTENT,
           ...parsed,
-          pages: { ...DEFAULT_CONTENT.pages, ...parsed.pages },
+          pages: { ...DEFAULT_CONTENT.pages, ...migratedPages },
           proposals: parsed.proposals || []
         }
       } catch (e) {
@@ -135,7 +101,6 @@ function App() {
   })
   
   const [isLoading, setIsLoading] = useState(true)
-  const [supabaseProposals, setSupabaseProposals] = useState<SupabaseProposal[]>([])
   
   // Editor states
   const [editTitle, setEditTitle] = useState('')
@@ -154,7 +119,7 @@ function App() {
   })
 
   // New States for Non-Admin Data Umat Flow
-  const [userSearchResult, setUserSearchResult] = useState<UmatRecord | null>(null)
+  const [userSearchResults, setUserSearchResults] = useState<UmatRecord[]>([])
   const [hasUserSearched, setHasUserSearched] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
   const [userUmatForm, setUserUmatForm] = useState<Omit<UmatRecord, 'id' | 'isPending'>>({
@@ -166,7 +131,6 @@ function App() {
   // Tutup menu otomatis setiap kali tab berubah
   useEffect(() => {
     setIsMobileMenuOpen(false)
-    setIsDropdownOpen(false)
   }, [activeTab])
 
   // Refactor fetchData to be reusable for polling
@@ -208,7 +172,7 @@ function App() {
           
           if (!isSameUmat || !isSamePages || !isSameSettings) {
             if (!isSilent) console.log("Mendapatkan data baru, memperbarui state...");
-            localStorage.setItem('gpibSiteContent', JSON.stringify(mergedContent));
+            localStorage.setItem('imkksaSiteContent', JSON.stringify(mergedContent));
             return mergedContent;
           }
           return prev;
@@ -227,49 +191,6 @@ function App() {
     const interval = setInterval(() => fetchData(true), 15000) // Increased interval slightly
     return () => clearInterval(interval)
   }, [])
-
-  const fetchSupabaseProposals = async () => {
-    console.log('Memulai fetch proposal dari Supabase...');
-    try {
-      const { data, error } = await supabase
-        .from('riwayat_download')
-        .select('*')
-        .order('no_urut', { ascending: false });
-      
-      if (error) {
-        console.error('Error Supabase fetch:', error.message);
-        // If it's a 404 or table not found, we should probably warn the user
-        if (error.code === 'PGRST116' || error.message.includes('not found')) {
-          console.error('PENTING: Tabel riwayat_download belum dibuat di Supabase!');
-        }
-      } else if (data) {
-        console.log('Berhasil fetch Supabase:', data.length, 'data ditemukan');
-        setSupabaseProposals(data);
-      }
-    } catch (err) {
-      console.error('Exception saat fetch Supabase:', err);
-    }
-  };
-
-  useEffect(() => {
-    console.log('Setting up Supabase real-time channel...');
-    fetchSupabaseProposals();
-
-    const channel = supabase
-      .channel('public:riwayat_download')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'riwayat_download' }, (payload) => {
-        console.log('Real-time change detected!', payload);
-        fetchSupabaseProposals();
-      })
-      .subscribe((status) => {
-        console.log('Supabase subscription status:', status);
-      });
-
-    return () => {
-      console.log('Cleaning up Supabase channel');
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -308,7 +229,7 @@ function App() {
     }
     
     setSiteContent(newContent)
-    localStorage.setItem('gpibSiteContent', JSON.stringify(newContent))
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
 
     try {
       const payload = JSON.stringify({ action: 'updateContent', data: newContent });
@@ -342,7 +263,7 @@ function App() {
 
     const newContent = { ...siteContent, umat: newUmatList }
     setSiteContent(newContent)
-    localStorage.setItem('gpibSiteContent', JSON.stringify(newContent))
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
 
     try {
       await fetch(SCRIPT_URL, {
@@ -368,7 +289,7 @@ function App() {
       const newUmatList = siteContent.umat.filter(u => u.nama.toLowerCase() !== namaToSearch.toLowerCase())
       const newContent = { ...siteContent, umat: newUmatList }
       setSiteContent(newContent)
-      localStorage.setItem('gpibSiteContent', JSON.stringify(newContent))
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
 
       try {
         await fetch(SCRIPT_URL, {
@@ -399,7 +320,7 @@ function App() {
 
     const newContent = { ...siteContent, umat: newUmatList };
     setSiteContent(newContent);
-    localStorage.setItem('gpibSiteContent', JSON.stringify(newContent));
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
     try {
       await fetch(SCRIPT_URL, {
@@ -420,7 +341,7 @@ function App() {
       const newContent = { ...siteContent, umat: newUmatList };
       
       setSiteContent(newContent);
-      localStorage.setItem('gpibSiteContent', JSON.stringify(newContent));
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
       try {
         await fetch(SCRIPT_URL, {
@@ -489,8 +410,8 @@ function App() {
     if (!userSearch.trim()) return;
     // Search only official umat
     const officialUmat = siteContent.umat.filter(u => !u.isPending);
-    const found = officialUmat.find(u => u.nama.toLowerCase().includes(userSearch.toLowerCase()));
-    setUserSearchResult(found || null);
+    const results = officialUmat.filter(u => u.nama.toLowerCase().includes(userSearch.toLowerCase()));
+    setUserSearchResults(results);
     setHasUserSearched(true);
     setShowUserForm(false);
     setUserSubmitMessage(null);
@@ -515,7 +436,7 @@ function App() {
       const newContent = { ...siteContent, umat: newUmatList };
       
       setSiteContent(newContent);
-      localStorage.setItem('gpibSiteContent', JSON.stringify(newContent));
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
       // Persist everything to Google Drive
       const payload = JSON.stringify({ action: 'updateUmat', data: newContent.umat });
@@ -526,7 +447,7 @@ function App() {
         body: payload
       });
       
-      setUserSubmitMessage('Data berhasil dikirim untuk di verifikasi admin GPIB');
+      setUserSubmitMessage('Data berhasil dikirim untuk di verifikasi admin IMKKSA');
       setShowUserForm(false);
       setUserUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
     } catch (error) {
@@ -537,30 +458,22 @@ function App() {
     }
   }
 
-  const renderDataUmat = () => {
-    const officialUmat = siteContent.umat.filter(u => !u.isPending);
-    const pendingUmat = siteContent.umat.filter(u => u.isPending);
+  const renderDataAnggota = () => {
+    const officialAnggota = siteContent.umat.filter(u => !u.isPending);
+    const pendingAnggota = siteContent.umat.filter(u => u.isPending);
 
     return (
       <div className="page-card">
-        {isLoggedIn ? <h2>Data Umat & Statistik</h2> : <h2>Data Umat</h2>}
+        {isLoggedIn ? <h2>Data Anggota & Statistik</h2> : <h2>Data Anggota</h2>}
         
         {isLoggedIn ? (
           <div className="admin-data-section">
             <div className="admin-data-form">
-              <h3>Form Input Data Umat</h3>
+              <h3>Form Input Data Anggota</h3>
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Nama Umat:</label>
+                  <label>Nama Anggota:</label>
                   <input type="text" value={umatForm.nama} onChange={e => setUmatForm({...umatForm, nama: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Status:</label>
-                  <select value={umatForm.status} onChange={e => setUmatForm({...umatForm, status: e.target.value})}>
-                    <option value="Jemaat">Jemaat</option>
-                    <option value="Simpatisan">Simpatisan</option>
-                    <option value="Majelis">Majelis</option>
-                  </select>
                 </div>
                 <div className="form-group">
                   <label>NIK:</label>
@@ -587,7 +500,7 @@ function App() {
               <div className="photo-previews">
                 {umatForm.photo && (
                   <div className="photo-preview-item">
-                    <img src={umatForm.photo} alt="Umat" />
+                    <img src={umatForm.photo} alt="Anggota" />
                     <span>Photo</span>
                   </div>
                 )}
@@ -608,33 +521,31 @@ function App() {
                 />
               </div>
               <div className="admin-action-buttons">
-                <button className="btn-save" onClick={handleSaveUmat}>SIMPAN / PERBAHARUI DATA UMAT</button>
-                {officialUmat.some(u => u.nama.toLowerCase() === (umatForm.nama || '').toLowerCase()) && (
+                <button className="btn-save" onClick={handleSaveUmat}>SIMPAN / PERBAHARUI DATA ANGGOTA</button>
+                {officialAnggota.some(u => u.nama.toLowerCase() === (umatForm.nama || '').toLowerCase()) && (
                   <button className="btn-delete" onClick={() => handleDeleteUmat()}>HAPUS DATA</button>
                 )}
               </div>
             </div>
 
             <div className="admin-umat-list" style={{marginTop: '40px'}}>
-              <h3>Daftar Seluruh Data Umat</h3>
+              <h3>Daftar Seluruh Data Anggota</h3>
               <div className="table-responsive">
                 <table className="umat-table admin-table">
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Nama Umat</th>
-                      <th>Status</th>
+                      <th>Nama Anggota</th>
                       <th>NIK</th>
                       <th>No. HP</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {officialUmat.length > 0 ? officialUmat.map((u, idx) => (
+                    {officialAnggota.length > 0 ? officialAnggota.map((u, idx) => (
                       <tr key={u.id}>
                         <td>{idx + 1}</td>
                         <td>{u.nama}</td>
-                        <td>{u.status}</td>
                         <td>{u.nik || '-'}</td>
                         <td>{u.noHp || '-'}</td>
                         <td>
@@ -646,7 +557,7 @@ function App() {
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={6} style={{textAlign: 'center'}}>Belum ada data umat.</td>
+                        <td colSpan={5} style={{textAlign: 'center'}}>Belum ada data anggota.</td>
                       </tr>
                     )}
                   </tbody>
@@ -657,24 +568,22 @@ function App() {
             <div className="admin-verification-list" style={{marginTop: '50px', borderTop: '2px solid var(--secondary-color)', paddingTop: '30px'}}>
               <h3 style={{ color: 'var(--primary-color)' }}>Antrean Revisi / Update Mandiri</h3>
               <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>
-                Berikut adalah data yang diisi secara mandiri oleh umat dan memerlukan verifikasi Admin.
+                Berikut adalah data yang diisi secara mandiri oleh anggota dan memerlukan verifikasi Admin.
               </p>
               <div className="table-responsive">
                 <table className="umat-table admin-table">
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Nama Umat</th>
-                      <th>Status</th>
+                      <th>Nama Anggota</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingUmat.length > 0 ? pendingUmat.map((u, idx) => (
+                    {pendingAnggota.length > 0 ? pendingAnggota.map((u, idx) => (
                       <tr key={u.id}>
                         <td>{idx + 1}</td>
                         <td style={{ fontWeight: '600' }}>{u.nama}</td>
-                        <td>{u.status}</td>
                         <td>
                           <div className="table-actions">
                             <button 
@@ -696,7 +605,7 @@ function App() {
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={4} style={{textAlign: 'center', padding: '30px', color: '#888'}}>
+                        <td colSpan={3} style={{textAlign: 'center', padding: '30px', color: '#888'}}>
                           Tidak ada antrean revisi mandiri saat ini.
                         </td>
                       </tr>
@@ -711,7 +620,7 @@ function App() {
             <div className="user-search-container" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
               <input 
                 type="text" 
-                placeholder="Cari Nama Umat..." 
+                placeholder="Cari Nama Anggota..." 
                 value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
                 style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
@@ -726,21 +635,20 @@ function App() {
                     <thead>
                       <tr>
                         <th>No</th>
-                        <th>NAMA UMAT</th>
-                        <th>STATUS</th>
+                        <th>NAMA ANGGOTA</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {userSearchResult ? (
-                        <tr>
-                          <td>1</td>
+                      {userSearchResults.length > 0 ? userSearchResults.map((result, idx) => (
+                        <tr key={result.id}>
+                          <td>{idx + 1}</td>
                           <td>
-                            {userSearchResult.nama}
+                            {result.nama}
                             <div style={{ marginTop: '8px' }}>
                               <button 
                                 className="btn-edit-small" 
                                 onClick={() => {
-                                  setUserUmatForm({ ...userSearchResult });
+                                  setUserUmatForm({ ...result });
                                   setShowUserForm(true);
                                   setUserSubmitMessage(null);
                                 }}
@@ -749,11 +657,10 @@ function App() {
                               </button>
                             </div>
                           </td>
-                          <td>{userSearchResult.status}</td>
                         </tr>
-                      ) : (
+                      )) : (
                         <tr>
-                          <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
+                          <td colSpan={2} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
                             Data Tidak Ditemukan
                           </td>
                         </tr>
@@ -762,12 +669,12 @@ function App() {
                   </table>
                 </div>
 
-                {!userSearchResult && (
+                {userSearchResults.length === 0 && (
                   <div style={{ textAlign: 'center', marginTop: '20px' }}>
                     <button 
                       className="btn-save" 
                       onClick={() => {
-                        setUserUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
+                        setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
                         setShowUserForm(true);
                         setUserSubmitMessage(null);
                       }}
@@ -781,24 +688,16 @@ function App() {
 
             {showUserForm && (
               <div className="user-input-form" style={{ marginTop: '40px', padding: '25px', background: '#f9f9f9', borderRadius: '12px', border: '1px solid #eee' }}>
-                <h3 style={{ marginBottom: '20px', color: 'var(--nav-bg)' }}>Lengkapi Data Umat</h3>
+                <h3 style={{ marginBottom: '20px', color: 'var(--nav-bg)' }}>Lengkapi Data Anggota</h3>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label>Nama Umat <span style={{ color: 'red' }}>*</span>:</label>
+                    <label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label>
                     <input 
                       type="text" 
                       value={userUmatForm.nama} 
                       onChange={e => setUserUmatForm({...userUmatForm, nama: e.target.value})} 
                       required
                     />
-                  </div>
-                  <div className="form-group">
-                    <label>Status:</label>
-                    <select value={userUmatForm.status} onChange={e => setUserUmatForm({...userUmatForm, status: e.target.value})}>
-                      <option value="Jemaat">Jemaat</option>
-                      <option value="Simpatisan">Simpatisan</option>
-                      <option value="Majelis">Majelis</option>
-                    </select>
                   </div>
                   <div className="form-group">
                     <label>NIK:</label>
@@ -886,40 +785,6 @@ function App() {
     )
   }
 
-  const handleAddProposalSupabase = async (pemohon: string, tujuanSurat: string) => {
-    const { data, error } = await supabase.rpc('create_proposal', {
-      pemohon_name: pemohon,
-      tujuan: tujuanSurat
-    });
-    if (error) {
-      console.error('Error adding proposal:', error);
-      throw error;
-    }
-    return data;
-  };
-
-  const handleEditProposalSupabase = async (id: number, updates: Partial<SupabaseProposal>) => {
-    const { error } = await supabase
-      .from('riwayat_download')
-      .update(updates)
-      .eq('id', id);
-    if (error) {
-      console.error('Error updating proposal:', error);
-      throw error;
-    }
-  };
-
-  const handleDeleteProposalSupabase = async (id: number) => {
-    const { error } = await supabase
-      .from('riwayat_download')
-      .delete()
-      .eq('id', id);
-    if (error) {
-      console.error('Error deleting proposal:', error);
-      throw error;
-    }
-  };
-
   const renderPage = () => {
     if (activeTab === 'Login' && !isLoggedIn) {
       return (
@@ -930,20 +795,8 @@ function App() {
       )
     }
 
-    if (activeTab === 'Data Umat') {
-      return renderDataUmat()
-    }
-
-    if (activeTab === 'Download') {
-      return (
-        <DownloadProposal 
-          isLoggedIn={isLoggedIn} 
-          proposals={supabaseProposals}
-          onAddProposal={handleAddProposalSupabase}
-          onEditProposal={handleEditProposalSupabase}
-          onDeleteProposal={handleDeleteProposalSupabase}
-        />
-      )
+    if (activeTab === 'Data Anggota') {
+      return renderDataAnggota()
     }
 
     const currentPage = siteContent.pages[activeTab]
@@ -1040,9 +893,9 @@ function App() {
     return (
       <div className="loading-screen">
         <div className="loading-logo-container">
-          <img src={siteContent?.settings?.logo || "/LOGO_GPIB.jpg"} alt="Logo GPIB" />
+          <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
         </div>
-        <p>Membuka situs GPIB Banda Aceh...</p>
+        <p>Membuka situs IMKKSA Banda Aceh Sekitar...</p>
       </div>
     )
   }
@@ -1051,7 +904,7 @@ function App() {
     <div className="app-container">
       <header className="header">
         <div className="logo-container">
-          <img src={siteContent.settings.logo} alt="Logo GPIB" />
+          <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
         </div>
         <h1>{siteContent.settings.title}</h1>
       </header>
@@ -1068,44 +921,17 @@ function App() {
             Beranda
           </li>
           <li 
-            className={activeTab === 'Jadwal Ibadah' ? 'active' : ''}
-            onClick={() => { setActiveTab('Jadwal Ibadah'); setIsMobileMenuOpen(false); }}
+            className={activeTab === 'Jadwal Keluarga' ? 'active' : ''}
+            onClick={() => { setActiveTab('Jadwal Keluarga'); setIsMobileMenuOpen(false); }}
           >
-            Jadwal Ibadah
-          </li>
-          
-          <li className={`dropdown ${['Organisasi Gereja', 'PA', 'PT', 'GP', 'PKB', 'PKP', 'GermasaLH', 'PG', 'Inforkom-Litbang'].includes(activeTab) ? 'active' : ''} ${isDropdownOpen ? 'dropdown-open' : ''}`}>
-            <span onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-              Organisasi Gereja {isDropdownOpen ? '▴' : '▾'}
-            </span>
-            <ul className="dropdown-menu">
-              <li onClick={() => { setActiveTab('Organisasi Gereja'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Struktur Organisasi</li>
-              <li className="dropdown-submenu">
-                <span>Pelayanan Kategorial (PELKAT) ▸</span>
-                <ul className="submenu-list">
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('PA'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Pelayanan Anak (PA)</li>
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('PT'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Pelayanan Taruna (PT)</li>
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('GP'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Gerakan Pemuda (GP)</li>
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('PKB'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Persekutuan Kaum Bapak (PKB)</li>
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('PKP'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Persekutuan Kaum Perempuan (PKP)</li>
-                </ul>
-              </li>
-              <li className="dropdown-submenu">
-                <span>KOMISI ▸</span>
-                <ul className="submenu-list">
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('GermasaLH'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>GermasaLH (Gereja, Masyarakat, Agama, Lingkungan Hidup)</li>
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('PG'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>PG (Pembangunan Gereja)</li>
-                  <li onClick={(e) => { e.stopPropagation(); setActiveTab('Inforkom-Litbang'); setIsMobileMenuOpen(false); setIsDropdownOpen(false); }}>Inforkom-Litbang (Info, Orga, Kom, Litbang)</li>
-                </ul>
-              </li>
-            </ul>
+            Jadwal Keluarga
           </li>
 
           <li 
-            className={activeTab === 'Data Umat' ? 'active' : ''}
-            onClick={() => { setActiveTab('Data Umat'); setIsMobileMenuOpen(false); }}
+            className={activeTab === 'Data Anggota' ? 'active' : ''}
+            onClick={() => { setActiveTab('Data Anggota'); setIsMobileMenuOpen(false); }}
           >
-            Data Umat
+            Data Anggota
           </li>
 
           {isLoggedIn ? (
@@ -1118,13 +944,6 @@ function App() {
               Login
             </li>
           )}
-
-          <li 
-            className={activeTab === 'Download' ? 'active' : ''}
-            onClick={() => { setActiveTab('Download'); setIsMobileMenuOpen(false); }}
-          >
-            Download
-          </li>
         </ul>
       </nav>
 
@@ -1133,7 +952,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        &copy; 2026 GPIB BANDA ACEH. All Rights Reserved.
+        &copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.
       </footer>
     </div>
   )

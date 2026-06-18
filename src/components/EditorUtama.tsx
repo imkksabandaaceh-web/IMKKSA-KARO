@@ -90,7 +90,7 @@ const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, set
           <div style={{ marginTop: '15px' }}>
             <a 
               href={berandaPdf} 
-              download="Warta_Jemaat_GPIB.pdf" 
+              download="Informasi_Anggota_IMKKSA.pdf" 
               target="_blank" 
               rel="noopener noreferrer"
               className="btn-save"
