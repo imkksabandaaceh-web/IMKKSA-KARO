@@ -142,6 +142,7 @@ function App() {
       
       const data = await response.json()
       console.log("Data mentah dari Google Apps Script:", data); // Menambahkan console.log
+      console.log("SERVER DATA", data.settings); // Menambahkan console.log sesuai permintaan
       if (!isSilent) console.log("Data berhasil diambil dari Drive:", data);
       
       if (data && (data.settings || data.pages)) {
