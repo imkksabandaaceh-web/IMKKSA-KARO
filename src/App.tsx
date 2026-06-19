@@ -55,7 +55,7 @@ const DEFAULT_CONTENT: FullContent = {
   },
   pages: {
     'Beranda': {
-      title: 'Selamat Datang di IMKKSA Banda Aceh Sekitar',
+      title: 'Selamat Datang di Website Resmi IMKKSA Banda Aceh Sekitar',
       content: '<p>Membangun kebersamaan dan kekeluargaan di tengah masyarakat Banda Aceh Sekitar.</p>'
     },
     'Jadwal Keluarga': {
@@ -111,14 +111,14 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [showPdfReader, setShowPdfReader] = useState(false)
 
-  // Data Umat States
+  // data anggota States
   const [userSearch, setUserSearch] = useState('')
   const [adminSearch, setAdminSearch] = useState('')
   const [umatForm, setUmatForm] = useState<Omit<UmatRecord, 'id' | 'isPending'>>({
     nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: ''
   })
 
-  // New States for Non-Admin Data Umat Flow
+  // New States for Non-Admin data anggota Flow
   const [userSearchResults, setUserSearchResults] = useState<UmatRecord[]>([])
   const [hasUserSearched, setHasUserSearched] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
@@ -252,7 +252,7 @@ function App() {
     }
   }
 
-  // Data Umat Handlers
+  // data anggota Handlers
   const handleSaveUmat = async () => {
     if (!umatForm.nama) {
       alert('Nama Umat harus diisi.')
@@ -274,9 +274,9 @@ function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
       })
-      alert('Data Umat Berhasil Disimpan!')
+      alert('data anggota Berhasil Disimpan!')
     } catch (error) {
-      console.error("Gagal sinkron data umat:", error)
+      console.error("Gagal sinkron data anggota:", error)
     }
 
     setUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' })
@@ -287,7 +287,7 @@ function App() {
     const namaToSearch = targetNama || umatForm.nama
     if (!namaToSearch) return
 
-    if (window.confirm(`Apakah Anda yakin ingin menghapus data umat: ${namaToSearch}?`)) {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data anggota: ${namaToSearch}?`)) {
       const newUmatList = siteContent.umat.filter(u => u.nama.toLowerCase() !== namaToSearch.toLowerCase())
       const newContent = { ...siteContent, umat: newUmatList }
       setSiteContent(newContent)
@@ -300,9 +300,9 @@ function App() {
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
         })
-        alert('Data Umat Berhasil Dihapus!')
+        alert('data anggota Berhasil Dihapus!')
       } catch (error) {
-        console.error("Gagal menghapus data umat:", error)
+        console.error("Gagal menghapus data anggota:", error)
       }
 
       if (!targetNama || targetNama.toLowerCase() === umatForm.nama.toLowerCase()) {
@@ -331,9 +331,9 @@ function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
       });
-      alert('Data Umat Berhasil Disimpan & Diverifikasi!');
+      alert('data anggota Berhasil Disimpan & Diverifikasi!');
     } catch (error) {
-      console.error("Gagal verifikasi data umat:", error);
+      console.error("Gagal verifikasi data anggota:", error);
     }
   }
 
@@ -801,6 +801,7 @@ function App() {
       return renderDataAnggota()
     }
 
+    console.log("ISI BERANDA:", siteContent.pages['Beranda']?.content)
     const currentPage = siteContent.pages[activeTab]
     if (!currentPage) return null
 
@@ -812,7 +813,9 @@ function App() {
               <h2>{currentPage.title}</h2>
               <div 
                 className="content-body" 
-                dangerouslySetInnerHTML={{ __html: currentPage.content || '' }} 
+                dangerouslySetInnerHTML={{ 
+                  __html: (currentPage.content || '').replace(/&nbsp;/g, ' ')
+                }} 
               />
               
               {siteContent.settings.berandaPdf && (

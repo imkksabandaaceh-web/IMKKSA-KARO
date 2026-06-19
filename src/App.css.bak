@@ -1,12 +1,12 @@
 /* General Styles with Modern-Traditional Fusion */
 :root {
-  --primary-color: #2e7d32;
-  --primary-hover: #256428;
-  --secondary-color: #8bc34a;
-  --bg-color: #f4f8f4;
+  --primary-color: #8b0000;
+  --primary-hover: #a50000;
+  --secondary-color: #d4af37;
+  --bg-color: #fdfaf5;
   --text-color: #2c3e50;
-  --nav-bg: #2f5d50;
-  --accent-color: #5f8d6a;
+  --nav-bg: #1b3a2a;
+  --accent-color: #4a6741;
   --white: #ffffff;
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
   --shadow-md: 0 8px 24px rgba(0,0,0,0.1);
@@ -127,7 +127,7 @@ h1, h2, h3 {
   text-align: center;
   padding: 80px 20px;
   background: var(--white);
-  background: linear-gradient(135deg, #f7fbf7 0%, #edf5ed 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #fdfaf5 100%);
   border-bottom: 4px solid var(--secondary-color);
   position: relative;
 }
@@ -185,7 +185,7 @@ h1, h2, h3 {
   width: 100%;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  background-color: rgba(47, 93, 80, 0.95);
+  background-color: rgba(27, 58, 42, 0.95);
 }
 
 .nav-links {

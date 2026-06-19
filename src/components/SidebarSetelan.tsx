@@ -76,7 +76,7 @@ const SidebarSetelan: React.FC<SidebarSetelanProps> = ({
       const fileName = `beranda_latest_${Date.now()}.pdf`;
       const { error } = await supabase.storage
         .from('beranda-pdf')
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, file);
 
       if (error) throw error;
 

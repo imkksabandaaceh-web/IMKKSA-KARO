@@ -1,13 +1,13 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --text: #3a4750; /* Darker grey for better contrast on light green */
+  --text-h: #08060d; /* Keep as is for strong headings */
+  --bg: #eaf7ed; /* Soft, light green background */
+  --border: #c8e6c9; /* Lighter border matching green theme */
+  --code-bg: #f0f7f1; /* Light green code background */
+  --accent: #4CAF50; /* Medium green for accent */
+  --accent-bg: rgba(76, 175, 80, 0.1);
+  --accent-border: rgba(76, 175, 80, 0.5);
+  --social-bg: rgba(240, 247, 241, 0.5); /* Matching code-bg */
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
@@ -32,19 +32,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
+    --text: #b0c5c7; /* Lighter grey-blue for contrast on dark background */
+    --text-h: #ffffff; /* Pure white for headings */
+    --bg: #283c3f; /* Dark, muted green-blue background */
+    --border: #4f6d7a; /* Darker border */
+    --code-bg: #1e2a2c; /* Dark green-blue code background */
+    --accent: #81c784; /* Lighter green for accent */
+    --accent-bg: rgba(129, 199, 132, 0.15);
+    --accent-border: rgba(129, 199, 132, 0.5);
+    --social-bg: rgba(30, 42, 44, 0.5); /* Matching code-bg */
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
 
+  /* Keep existing social icon filter for visibility */
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
