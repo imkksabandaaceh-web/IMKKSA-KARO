@@ -3,11 +3,13 @@ import './App.css'
 import LoginForm from './components/LoginForm'
 import { authService } from './services/auth'
 import AdminDashboard from './components/AdminDashboard'
+import Pengurus from './components/Pengurus'
+import PengurusAdmin from './components/PengurusAdmin'
 import { compressImage } from './utils/imageUtils'
 
 
 // Types
-type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Data Anggota' | 'Login';
+type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Pengurus' | 'Data Anggota' | 'Login';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -38,11 +40,19 @@ interface UmatRecord {
   isPending?: boolean; // New flag for verification queue
 }
 
+interface PengurusRecord {
+  id: string
+  jabatan: string
+  nama: string
+  photo: string
+}
+
 interface FullContent {
   settings: SiteSettings;
   pages: Record<string, PageContent>;
   umat: UmatRecord[];
-  proposals: any[]; // New field for shared proposal history
+  proposals: any[];
+  pengurus: PengurusRecord[]; // New field for shared proposal history
 }
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnXm-7uc82ZXbcqLVp6wSDmhtelLbods2bHTHEjqov06jzTGf-eCXuXsDnzzGlFDBkTw/exec';
@@ -64,7 +74,8 @@ const DEFAULT_CONTENT: FullContent = {
     }
   },
   umat: [],
-  proposals: []
+  proposals: [],
+  pengurus: []
 };
 
 function App() {
@@ -110,6 +121,11 @@ function App() {
   const [editBerandaPdf, setEditBerandaPdf] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [showPdfReader, setShowPdfReader] = useState(false)
+  const [pengurusForm, setPengurusForm] = useState({
+   jabatan: 'Ketua',
+   nama: '',
+   photo: ''
+})
 
   // data anggota States
   const [userSearch, setUserSearch] = useState('')
@@ -407,6 +423,87 @@ function App() {
       reader.readAsDataURL(file)
     }
   }
+const handlePengurusPhoto = (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+
+  const file = e.target.files?.[0]
+
+  if (!file) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert('File terlalu besar! Maksimal 5 MB.')
+    e.target.value = ''
+    return
+  }
+
+  const reader = new FileReader()
+
+  reader.onloadend = async () => {
+
+    const base64 = reader.result as string
+
+    const compressed =
+      await compressImage(base64, 800, 0.6)
+
+    setPengurusForm(prev => ({
+      ...prev,
+      photo: compressed
+    }))
+  }
+
+  reader.readAsDataURL(file)
+}
+const handleSavePengurus = async () => {
+  if (!pengurusForm.nama.trim()) {
+    alert('Nama Pengurus wajib diisi')
+    return
+  }
+
+  const pengurusLama = siteContent.pengurus || []
+
+  const pengurusBaru = pengurusLama.filter(
+    p => p.jabatan !== pengurusForm.jabatan
+  )
+
+  pengurusBaru.push({
+    id: Date.now().toString(),
+    jabatan: pengurusForm.jabatan,
+    nama: pengurusForm.nama,
+    photo: pengurusForm.photo
+  })
+
+  const newContent = {
+    ...siteContent,
+    pengurus: pengurusBaru
+  }
+
+  setSiteContent(newContent)
+
+  localStorage.setItem(
+    'imkksaSiteContent',
+    JSON.stringify(newContent)
+  )
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify({
+        action: 'updateContent',
+        data: newContent
+      })
+    })
+
+    alert('Data Pengurus berhasil disimpan')
+  } catch (error) {
+    console.error('Gagal menyimpan pengurus', error)
+    alert('Gagal menyimpan data')
+  }
+}
 
   const handleUserSearch = () => {
     if (!userSearch.trim()) return;
@@ -787,6 +884,83 @@ function App() {
     )
   }
 
+  const renderPengurus = () => {
+  const pengurusList = siteContent.pengurus || []
+
+  if (!isLoggedIn) {
+    // Tampilan untuk pengunjung biasa
+    return (
+      <div className="page-content">
+        <h2>Daftar Pengurus</h2>
+        <div className="pengurus-grid">
+          {pengurusList.map(p => (
+            <div key={p.id} className="pengurus-card">
+              {p.photo && (
+                <img 
+                  src={p.photo} 
+                  alt={p.nama} 
+                  className="pengurus-photo" 
+                />
+              )}
+              <h3>{p.jabatan}</h3>
+              <p>{p.nama}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  } else {
+    // Tampilan untuk admin (form input)
+    return (
+      <div className="page-content">
+        <h2>Kelola Pengurus</h2>
+        <div className="form-section">
+          <label>Jabatan</label>
+          <select 
+            value={pengurusForm.jabatan} 
+            onChange={e => setPengurusForm({ ...pengurusForm, jabatan: e.target.value })}
+          >
+            <option value="Ketua">Ketua</option>
+            <option value="Wakil Ketua">Wakil Ketua</option>
+            <option value="Sekretaris">Sekretaris</option>
+            <option value="Wakil Sekretaris">Wakil Sekretaris</option>
+            <option value="Bendahara">Bendahara</option>
+            <option value="Wakil Bendahara">Wakil Bendahara</option>
+          </select>
+
+          <label>Nama</label>
+          <input 
+            type="text" 
+            value={pengurusForm.nama} 
+            onChange={e => setPengurusForm({ ...pengurusForm, nama: e.target.value })}
+          />
+
+          <label>Foto</label>
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={handlePengurusPhoto} 
+          />
+
+          <button className="btn-save" onClick={handleSavePengurus}>
+            Simpan Pengurus
+          </button>
+        </div>
+
+        <h3>Data Pengurus Saat Ini</h3>
+        <ul>
+          {pengurusList.map(p => (
+            <li key={p.id}>
+              {p.jabatan}: {p.nama}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+}
+ 
+
   const renderPage = () => {
     if (activeTab === 'Login' && !isLoggedIn) {
       return (
@@ -799,6 +973,10 @@ function App() {
 
     if (activeTab === 'Data Anggota') {
       return renderDataAnggota()
+    }
+
+    if (activeTab === 'Pengurus') {
+      return renderPengurus()   //
     }
 
     console.log("ISI BERANDA:", siteContent.pages['Beranda']?.content)
@@ -938,14 +1116,21 @@ function App() {
           >
             Data Anggota
           </li>
-
+          <li 
+            className={activeTab === 'Pengurus' ? 'active' : ''}
+            onClick={() => { setActiveTab('Pengurus'); setIsMobileMenuOpen(false); }}
+          >
+           Pengurus
+          </li> {/* Tambahan menu baru */}
           {isLoggedIn ? (
-            <li onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}>Logout (Admin)</li>
-          ) : (
-            <li 
-              className={activeTab === 'Login' ? 'active' : ''} 
-              onClick={() => { setActiveTab('Login'); setIsMobileMenuOpen(false); }}
-            >
+          <li onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}>
+            Logout (Admin)
+          </li>
+         ) : (
+          <li 
+            className={activeTab === 'Login' ? 'active' : ''} 
+            onClick={() => { setActiveTab('Login'); setIsMobileMenuOpen(false); }}
+          >
               Login
             </li>
           )}
