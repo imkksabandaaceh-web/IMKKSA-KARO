@@ -4,8 +4,8 @@ import AdminDashboard from './components/AdminDashboard'
 
 const compressImage = async (
   base64: string,
-  width: number,
-  quality: number
+  _width: number,   // Tambahkan _
+  _quality: number  // Tambahkan _
 ) => {
   return base64
 }
