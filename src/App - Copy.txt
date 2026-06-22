@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import Pengurus from './components/Pengurus'
+import PengurusAdmin from './components/PengurusAdmin'
 import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
 
 const compressImage = async (
-  base64: string
+  base64: string,
+  width: number,
+  quality: number
 ) => {
   return base64
 }
+
 
 // Types
 type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Pengurus' | 'Data Anggota' | 'Login';
@@ -77,7 +83,6 @@ const DEFAULT_CONTENT: FullContent = {
   proposals: [],
   pengurus: []
 };
-
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('Beranda')
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false)
@@ -153,8 +158,8 @@ function App() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json()
-      console.log("Data mentah dari Google Apps Script:", data);
-      console.log("SERVER DATA", data.settings);
+      console.log("Data mentah dari Google Apps Script:", data); // Menambahkan console.log
+      console.log("SERVER DATA", data.settings); // Menambahkan console.log sesuai permintaan
       if (!isSilent) console.log("Data berhasil diambil dari Drive:", data);
 
       if (data && (data.settings || data.pages)) {
@@ -170,21 +175,21 @@ function App() {
           }
         });
 
+        // SAFETY: Only update if the incoming data actually contains records
+        // This prevents overwriting with empty arrays if the script fails to fetch records
         const mergedContent = {
-          ...siteContent,
+          ...siteContent, // Start with current content
           settings: data.settings ? { ...DEFAULT_CONTENT.settings, ...data.settings } : siteContent.settings,
           pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : siteContent.pages,
-          umat: (data.umat && data.umat.length > 0) ? data.umat : siteContent.umat,
-          pengurus: data.pengurus ? data.pengurus : siteContent.pengurus
+          umat: (data.umat && data.umat.length > 0) ? data.umat : siteContent.umat
         }
 
         setSiteContent(prev => {
           const isSameUmat = JSON.stringify(prev.umat) === JSON.stringify(mergedContent.umat);
           const isSamePages = JSON.stringify(prev.pages) === JSON.stringify(mergedContent.pages);
           const isSameSettings = JSON.stringify(prev.settings) === JSON.stringify(mergedContent.settings);
-          const isSamePengurus = JSON.stringify(prev.pengurus) === JSON.stringify(mergedContent.pengurus);
 
-          if (!isSameUmat || !isSamePages || !isSameSettings || !isSamePengurus) {
+          if (!isSameUmat || !isSamePages || !isSameSettings) {
             if (!isSilent) console.log("Mendapatkan data baru, memperbarui state...");
             localStorage.setItem('imkksaSiteContent', JSON.stringify(mergedContent));
             return mergedContent;
@@ -202,7 +207,7 @@ function App() {
   // Fetch data on mount and setup polling
   useEffect(() => {
     fetchData()
-    const interval = setInterval(() => fetchData(true), 15000)
+    const interval = setInterval(() => fetchData(true), 15000) // Increased interval slightly
     return () => clearInterval(interval)
   }, [])
 
@@ -218,10 +223,6 @@ function App() {
     }
   }, [isLoggedIn, activeTab, siteContent])
 
-  const handleLogout = () => {
-    setIsLoggedIn(false)
-    setActiveTab('Beranda')
-  }
 
   const saveChanges = async (updatedData?: any) => {
     setIsSaving(true)
@@ -270,6 +271,7 @@ function App() {
       return
     }
 
+    // Filter out any pending version of this person if admin is saving it officially
     const newUmatList = siteContent.umat.filter((u: UmatRecord) => !u.isPending).filter((u: UmatRecord) => u.nama.toLowerCase() !== umatForm.nama.toLowerCase());
     newUmatList.push({ ...umatForm, id: Date.now().toString(), isPending: false });
 
@@ -284,7 +286,7 @@ function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
       })
-      alert('Data Anggota Berhasil Disimpan!')
+      alert('data anggota Berhasil Disimpan!')
     } catch (error) {
       console.error("Gagal sinkron data anggota:", error)
     }
@@ -310,7 +312,7 @@ function App() {
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
         })
-        alert('Data Anggota Berhasil Dihapus!')
+        alert('data anggota Berhasil Dihapus!')
       } catch (error) {
         console.error("Gagal menghapus data anggota:", error)
       }
@@ -323,7 +325,10 @@ function App() {
   }
 
   const handleApproveUmat = async (umat: UmatRecord) => {
+    // 1. Remove any existing entries (both pending and official) with same name
     const cleanList = siteContent.umat.filter(u => u.nama.toLowerCase() !== umat.nama.toLowerCase());
+
+    // 2. Add as official (isPending: false)
     const officialUmat = { ...umat, isPending: false, id: Date.now().toString() };
     const newUmatList = [...cleanList, officialUmat];
 
@@ -338,7 +343,7 @@ function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
       });
-      alert('Data Anggota Berhasil Disimpan & Diverifikasi!');
+      alert('data anggota Berhasil Disimpan & Diverifikasi!');
     } catch (error) {
       console.error("Gagal verifikasi data anggota:", error);
     }
@@ -382,6 +387,7 @@ function App() {
 
   const onAdminSearch = (name: string) => {
     setAdminSearch(name)
+    // Only search official umat
     const found = siteContent.umat.find(u => !u.isPending && u.nama.toLowerCase() === name.toLowerCase())
     if (found) {
       setUmatForm({
@@ -407,15 +413,18 @@ function App() {
       const reader = new FileReader()
       reader.onloadend = async () => {
         const base64 = reader.result as string
-        const compressed = await compressImage(base64)
+        const compressed = await compressImage(base64, 800, 0.6)
         setUmatForm({ ...umatForm, [field]: compressed })
       }
       reader.readAsDataURL(file)
     }
   }
+  const handlePengurusPhoto = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
 
-  const handlePengurusPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+
     if (!file) return
 
     if (file.size > 5 * 1024 * 1024) {
@@ -425,17 +434,22 @@ function App() {
     }
 
     const reader = new FileReader()
+
     reader.onloadend = async () => {
+
       const base64 = reader.result as string
-      const compressed = await compressImage(base64)
+
+      const compressed =
+        await compressImage(base64, 800, 0.6)
+
       setPengurusForm(prev => ({
         ...prev,
         photo: compressed
       }))
     }
+
     reader.readAsDataURL(file)
   }
-
   const handleSavePengurus = async () => {
     if (!pengurusForm.nama.trim()) {
       alert('Nama Pengurus wajib diisi')
@@ -443,7 +457,10 @@ function App() {
     }
 
     const pengurusLama = siteContent.pengurus || []
-    const pengurusBaru = pengurusLama.filter(p => p.jabatan !== pengurusForm.jabatan)
+
+    const pengurusBaru = pengurusLama.filter(
+      p => p.jabatan !== pengurusForm.jabatan
+    )
 
     pengurusBaru.push({
       id: Date.now().toString(),
@@ -458,18 +475,25 @@ function App() {
     }
 
     setSiteContent(newContent)
-    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
+
+    localStorage.setItem(
+      'imkksaSiteContent',
+      JSON.stringify(newContent)
+    )
 
     try {
       await fetch(SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
+        headers: {
+          'Content-Type': 'text/plain'
+        },
         body: JSON.stringify({
           action: 'updateContent',
           data: newContent
         })
       })
+
       alert('Data Pengurus berhasil disimpan')
     } catch (error) {
       console.error('Gagal menyimpan pengurus', error)
@@ -479,6 +503,7 @@ function App() {
 
   const handleUserSearch = () => {
     if (!userSearch.trim()) return;
+    // Search only official umat
     const officialUmat = siteContent.umat.filter(u => !u.isPending);
     const results = officialUmat.filter(u => u.nama.toLowerCase().includes(userSearch.toLowerCase()));
     setUserSearchResults(results);
@@ -498,15 +523,17 @@ function App() {
       const verificationRecord: UmatRecord = {
         ...userUmatForm,
         id: 'verify_' + Date.now(),
-        isPending: true
+        isPending: true // MARK AS PENDING
       };
 
+      // Push to the main UMAT list but with isPending=true
       const newUmatList = [...siteContent.umat, verificationRecord];
       const newContent = { ...siteContent, umat: newUmatList };
 
       setSiteContent(newContent);
       localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
+      // Persist everything to Google Drive
       const payload = JSON.stringify({ action: 'updateUmat', data: newContent.umat });
       await fetch(SCRIPT_URL, {
         method: 'POST',
@@ -792,7 +819,7 @@ function App() {
                         const reader = new FileReader();
                         reader.onloadend = async () => {
                           const base64 = reader.result as string;
-                          const compressed = await compressImage(base64);
+                          const compressed = await compressImage(base64, 800, 0.6);
                           setUserUmatForm({ ...userUmatForm, photo: compressed });
                         }
                         reader.readAsDataURL(file);
@@ -812,7 +839,7 @@ function App() {
                         const reader = new FileReader();
                         reader.onloadend = async () => {
                           const base64 = reader.result as string;
-                          const compressed = await compressImage(base64);
+                          const compressed = await compressImage(base64, 800, 0.6);
                           setUserUmatForm({ ...userUmatForm, kk: compressed });
                         }
                         reader.readAsDataURL(file);
@@ -857,6 +884,7 @@ function App() {
     const pengurusList = siteContent.pengurus || []
 
     if (!isLoggedIn) {
+      // Tampilan untuk pengunjung biasa
       return (
         <div className="page-content">
           <h2>Daftar Pengurus</h2>
@@ -878,6 +906,7 @@ function App() {
         </div>
       )
     } else {
+      // Tampilan untuk admin (form input)
       return (
         <div className="page-content">
           <h2>Kelola Pengurus</h2>
@@ -927,7 +956,9 @@ function App() {
     }
   }
 
+
   const renderPage = () => {
+
     if (activeTab === 'Login' && !isLoggedIn) {
       return (
         <LoginForm
@@ -947,138 +978,194 @@ function App() {
       return renderPengurus()
     }
 
+    console.log("ISI BERANDA:", siteContent.pages['Beranda']?.content)
+
     const currentPage = siteContent.pages[activeTab]
     if (!currentPage) return null
 
-    return (
-      <div className="page-content">
-        {!isLoggedIn ? (
-          <div className="page-card">
-            <h2>{currentPage.title}</h2>
-            <div
-              className="content-body"
-              dangerouslySetInnerHTML={{
-                __html: (currentPage.content || '').replace(/&nbsp;/g, ' ')
-              }}
-            />
 
-            {activeTab === 'Beranda' && siteContent.settings.berandaPdf && (
-              <div className="pdf-viewer-section" style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-                {!showPdfReader ? (
-                  <button className="btn-save" onClick={() => setShowPdfReader(true)}>Read More (Buka PDF)</button>
-                ) : (
-                  <div className="pdf-reader-container">
-                    <button className="btn-delete" onClick={() => setShowPdfReader(false)} style={{ marginBottom: '10px' }}>Tutup PDF</button>
-                    <iframe
-                      src={`${siteContent.settings.berandaPdf}#toolbar=0`}
-                      width="100%"
-                      height="600px"
-                      style={{ border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      title="PDF Viewer"
-                    ></iframe>
-                    <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '10px', fontStyle: 'italic' }}>
-                      Catatan: Download dinonaktifkan untuk pengunjung umum.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <AdminDashboard
-            initialTitle={editTitle || ''}
-            initialContent={editContent || ''}
-            initialSiteTitle={editSiteTitle || ''}
-            initialSiteLogo={editLogo || ''}
-            initialBerandaPdf={editBerandaPdf || ''}
-            onSave={(data: any) => {
-              setEditTitle(data.title || '');
-              setEditContent(data.content || '');
-              setEditSiteTitle(data.siteTitle || '');
-              setEditLogo(data.siteLogo || '');
-              setEditBerandaPdf(data.berandaPdf || '');
-            }}
-            onPublish={(data: any) => saveChanges(data)}
-            isSaving={isSaving}
-          />
-        )}
-      </div>
-    )
-  }
-
-  if (isLoading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-logo-container">
-          <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
-        </div>
-        <p>Membuka situs IMKKSA Banda Aceh Sekitar...</p>
-      </div>
-    )
   }
 
   return (
-    <div className="app-container">
-      <header className="header">
-        <div className="logo-container">
-          <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
-        </div>
-        <h1>{siteContent.settings.title}</h1>
-      </header>
+    <LoginForm onLoginSuccess={() => {
+      setIsLoggedIn(true);
+      setActiveTab('Beranda');
+    }} />
+  )
+}
 
-      <nav className="navbar">
-        <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? '✕' : '☰'} Menu
-        </div>
-        <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-          <li
-            className={activeTab === 'Beranda' ? 'active' : ''}
-            onClick={() => { setActiveTab('Beranda'); setIsMobileMenuOpen(false); }}
-          >
-            Beranda
-          </li>
-          <li
-            className={activeTab === 'Jadwal Keluarga' ? 'active' : ''}
-            onClick={() => { setActiveTab('Jadwal Keluarga'); setIsMobileMenuOpen(false); }}
-          >
-            Jadwal Keluarga
-          </li>
-          <li
-            className={activeTab === 'Data Anggota' ? 'active' : ''}
-            onClick={() => { setActiveTab('Data Anggota'); setIsMobileMenuOpen(false); }}
-          >
-            Data Anggota
-          </li>
-          <li
-            className={activeTab === 'Pengurus' ? 'active' : ''}
-            onClick={() => { setActiveTab('Pengurus'); setIsMobileMenuOpen(false); }}
-          >
-            Pengurus
-          </li>
-          {isLoggedIn ? (
-            <li onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}>
-              Logout (Admin)
-            </li>
-          ) : (
-            <li
-              className={activeTab === 'Login' ? 'active' : ''}
-              onClick={() => { setActiveTab('Login'); setIsMobileMenuOpen(false); }}
-            >
-              Login
-            </li>
+if (activeTab === 'Data Anggota') {
+  return renderDataAnggota()
+}
+
+if (activeTab === 'Pengurus') {
+  return renderPengurus()   //
+}
+
+console.log("ISI BERANDA:", siteContent.pages['Beranda']?.content)
+const currentPage = siteContent.pages[activeTab]
+if (!currentPage) return null
+
+if (activeTab === 'Beranda') {
+  return (
+    <div className="page-content">
+      {!isLoggedIn ? (
+        <div className="page-card">
+          <h2>{currentPage.title}</h2>
+          <div
+            className="content-body"
+            dangerouslySetInnerHTML={{
+              __html: (currentPage.content || '').replace(/&nbsp;/g, ' ')
+            }}
+          />
+
+          {siteContent.settings.berandaPdf && (
+            <div className="pdf-viewer-section" style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+              {!showPdfReader ? (
+                <button className="btn-save" onClick={() => setShowPdfReader(true)}>Read More (Buka PDF)</button>
+              ) : (
+                <div className="pdf-reader-container">
+                  <button className="btn-delete" onClick={() => setShowPdfReader(false)} style={{ marginBottom: '10px' }}>Tutup PDF</button>
+                  <iframe
+                    src={`${siteContent.settings.berandaPdf}#toolbar=0`}
+                    width="100%"
+                    height="600px"
+                    style={{ border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    title="PDF Viewer"
+                  ></iframe>
+                  <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '10px', fontStyle: 'italic' }}>
+                    Catatan: Download dinonaktifkan untuk pengunjung umum.
+                  </p>
+                </div>
+              )}
+            </div>
           )}
-        </ul>
-      </nav>
-
-      <main className="main-content">
-        {renderPage()}
-      </main>
-
-      <footer className="footer">
-        &copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.
-      </footer>
+        </div>
+      ) : (
+        <AdminDashboard
+          initialTitle={editTitle || ''}
+          initialContent={editContent || ''}
+          initialSiteTitle={editSiteTitle || ''}
+          initialSiteLogo={editLogo || ''}
+          initialBerandaPdf={editBerandaPdf || ''}
+          onSave={(data: any) => {
+            setEditTitle(data.title || '');
+            setEditContent(data.content || '');
+            setEditSiteTitle(data.siteTitle || '');
+            setEditLogo(data.siteLogo || '');
+            setEditBerandaPdf(data.berandaPdf || '');
+          }}
+          onPublish={(data: any) => saveChanges(data)}
+          isSaving={isSaving}
+        />
+      )}
+    </div>
+  )
+}
+return (
+  <div className="page-content">
+    {!isLoggedIn ? (
+      <div className="page-card">
+        <h2>{currentPage.title}</h2>
+        <div
+          className="content-body"
+          dangerouslySetInnerHTML={{ __html: currentPage.content || '' }}
+        />
+      </div>
+    ) : (
+      <AdminDashboard
+        initialTitle={editTitle || ''}
+        initialContent={editContent || ''}
+        initialSiteTitle={editSiteTitle || ''}
+        initialSiteLogo={editLogo || ''}
+        initialBerandaPdf={editBerandaPdf || ''}
+        onSave={(data: any) => {
+          setEditTitle(data.title || '');
+          setEditContent(data.content || '');
+          setEditSiteTitle(data.siteTitle || '');
+          setEditLogo(data.siteLogo || '');
+          setEditBerandaPdf(data.berandaPdf || '');
+        }}
+        onPublish={(data: any) => saveChanges(data)}
+        isSaving={isSaving}
+      />
+    )}
+  </div>
+)
+  
+if (isLoading) {
+  return (
+    <div className="loading-screen">
+      <div className="loading-logo-container">
+        <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
+      </div>
+      <p>Membuka situs IMKKSA Banda Aceh Sekitar...</p>
     </div>
   )
 }
 
-export default App;
+return (
+  <div className="app-container">
+    <header className="header">
+      <div className="logo-container">
+        <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
+      </div>
+      <h1>{siteContent.settings.title}</h1>
+    </header>
+
+    <nav className="navbar">
+      <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+        {isMobileMenuOpen ? '✕' : '☰'} Menu
+      </div>
+      <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+        <li
+          className={activeTab === 'Beranda' ? 'active' : ''}
+          onClick={() => { setActiveTab('Beranda'); setIsMobileMenuOpen(false); }}
+        >
+          Beranda
+        </li>
+        <li
+          className={activeTab === 'Jadwal Keluarga' ? 'active' : ''}
+          onClick={() => { setActiveTab('Jadwal Keluarga'); setIsMobileMenuOpen(false); }}
+        >
+          Jadwal Keluarga
+        </li>
+
+        <li
+          className={activeTab === 'Data Anggota' ? 'active' : ''}
+          onClick={() => { setActiveTab('Data Anggota'); setIsMobileMenuOpen(false); }}
+        >
+          Data Anggota
+        </li>
+        <li
+          className={activeTab === 'Pengurus' ? 'active' : ''}
+          onClick={() => { setActiveTab('Pengurus'); setIsMobileMenuOpen(false); }}
+        >
+          Pengurus
+        </li> {/* Tambahan menu baru */}
+        {isLoggedIn ? (
+          <li onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}>
+            Logout (Admin)
+          </li>
+        ) : (
+          <li
+            className={activeTab === 'Login' ? 'active' : ''}
+            onClick={() => { setActiveTab('Login'); setIsMobileMenuOpen(false); }}
+          >
+            Login
+          </li>
+        )}
+      </ul>
+    </nav>
+
+    <main className="main-content">
+      {renderPage()}
+    </main>
+
+    <footer className="footer">
+      &copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.
+    </footer>
+  </div>
+)
+export default App
+
