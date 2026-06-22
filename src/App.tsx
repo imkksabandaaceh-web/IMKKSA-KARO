@@ -3,7 +3,9 @@ import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
 
 const compressImage = async (
-  base64: string
+  base64: string,
+  width: number,
+  quality: number
 ) => {
   return base64
 }
@@ -19,7 +21,7 @@ interface ContentBlock {
 interface PageContent {
   title: string;
   content: string;
-  blocks?: ContentBlock[]; // Opsional untuk migrasi
+  blocks?: ContentBlock[];
 }
 
 interface SiteSettings {
@@ -37,7 +39,7 @@ interface UmatRecord {
   noHp: string;
   photo: string;
   kk: string;
-  isPending?: boolean; // New flag for verification queue
+  isPending?: boolean;
 }
 
 interface PengurusRecord {
@@ -52,7 +54,7 @@ interface FullContent {
   pages: Record<string, PageContent>;
   umat: UmatRecord[];
   proposals: any[];
-  pengurus: PengurusRecord[]; // New field for shared proposal history
+  pengurus: PengurusRecord[];
 }
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnXm-7uc82ZXbcqLVp6wSDmhtelLbods2bHTHEjqov06jzTGf-eCXuXsDnzzGlFDBkTw/exec';
@@ -86,13 +88,11 @@ function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        // Migration logic for old tab names
         const migratedPages = parsed.pages || {};
         if (migratedPages['Jadwal Ibadah']) {
           migratedPages['Jadwal Keluarga'] = migratedPages['Jadwal Ibadah'];
           delete migratedPages['Jadwal Ibadah'];
         }
-
         return {
           ...DEFAULT_CONTENT,
           ...parsed,
@@ -139,13 +139,11 @@ function App() {
   const [userSubmitMessage, setUserSubmitMessage] = useState<string | null>(null)
   const [isSubmittingUserForm, setIsSubmittingUserForm] = useState(false)
 
-  // Tutup menu otomatis setiap kali tab berubah
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [activeTab])
 
-  // Refactor fetchData to be reusable for polling
   const fetchData = async (isSilent = false) => {
     if (!isSilent) console.log("Memulai pengambilan data dari Google Drive...");
     try {
@@ -153,10 +151,6 @@ function App() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const data = await response.json()
-      console.log("Data mentah dari Google Apps Script:", data);
-      console.log("SERVER DATA", data.settings);
-      if (!isSilent) console.log("Data berhasil diambil dari Drive:", data);
-
       if (data && (data.settings || data.pages)) {
         const migratedPages = { ...data.pages };
         Object.keys(migratedPages).forEach(key => {
@@ -185,7 +179,6 @@ function App() {
           const isSamePengurus = JSON.stringify(prev.pengurus) === JSON.stringify(mergedContent.pengurus);
 
           if (!isSameUmat || !isSamePages || !isSameSettings || !isSamePengurus) {
-            if (!isSilent) console.log("Mendapatkan data baru, memperbarui state...");
             localStorage.setItem('imkksaSiteContent', JSON.stringify(mergedContent));
             return mergedContent;
           }
@@ -199,7 +192,6 @@ function App() {
     }
   }
 
-  // Fetch data on mount and setup polling
   useEffect(() => {
     fetchData()
     const interval = setInterval(() => fetchData(true), 15000)
@@ -225,7 +217,6 @@ function App() {
 
   const saveChanges = async (updatedData?: any) => {
     setIsSaving(true)
-
     const finalTitle = updatedData?.title || editTitle
     const finalContent = updatedData?.content || editContent
     const finalSiteTitle = updatedData?.siteTitle || editSiteTitle
@@ -263,13 +254,11 @@ function App() {
     }
   }
 
-  // data anggota Handlers
   const handleSaveUmat = async () => {
     if (!umatForm.nama) {
       alert('Nama Umat harus diisi.')
       return
     }
-
     const newUmatList = siteContent.umat.filter((u: UmatRecord) => !u.isPending).filter((u: UmatRecord) => u.nama.toLowerCase() !== umatForm.nama.toLowerCase());
     newUmatList.push({ ...umatForm, id: Date.now().toString(), isPending: false });
 
@@ -288,7 +277,6 @@ function App() {
     } catch (error) {
       console.error("Gagal sinkron data anggota:", error)
     }
-
     setUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' })
     setAdminSearch('')
   }
@@ -348,7 +336,6 @@ function App() {
     if (window.confirm('Apakah Anda yakin ingin menghapus pengajuan revisi mandiri ini?')) {
       const newUmatList = siteContent.umat.filter(u => u.id !== umatId);
       const newContent = { ...siteContent, umat: newUmatList };
-
       setSiteContent(newContent);
       localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
@@ -368,13 +355,7 @@ function App() {
 
   const onEditUmat = (u: UmatRecord) => {
     setUmatForm({
-      nama: u.nama,
-      status: u.status,
-      nik: u.nik,
-      alamat: u.alamat,
-      noHp: u.noHp,
-      photo: u.photo,
-      kk: u.kk
+      nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk
     })
     setAdminSearch(u.nama)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -385,13 +366,7 @@ function App() {
     const found = siteContent.umat.find(u => !u.isPending && u.nama.toLowerCase() === name.toLowerCase())
     if (found) {
       setUmatForm({
-        nama: found.nama,
-        status: found.status,
-        nik: found.nik,
-        alamat: found.alamat,
-        noHp: found.noHp,
-        photo: found.photo,
-        kk: found.kk
+        nama: found.nama, status: found.status, nik: found.nik, alamat: found.alamat, noHp: found.noHp, photo: found.photo, kk: found.kk
       })
     }
   }
@@ -407,7 +382,7 @@ function App() {
       const reader = new FileReader()
       reader.onloadend = async () => {
         const base64 = reader.result as string
-        const compressed = await compressImage(base64)
+        const compressed = await compressImage(base64, 800, 0.6)
         setUmatForm({ ...umatForm, [field]: compressed })
       }
       reader.readAsDataURL(file)
@@ -417,21 +392,16 @@ function App() {
   const handlePengurusPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     if (file.size > 5 * 1024 * 1024) {
       alert('File terlalu besar! Maksimal 5 MB.')
       e.target.value = ''
       return
     }
-
     const reader = new FileReader()
     reader.onloadend = async () => {
       const base64 = reader.result as string
-      const compressed = await compressImage(base64)
-      setPengurusForm(prev => ({
-        ...prev,
-        photo: compressed
-      }))
+      const compressed = await compressImage(base64, 800, 0.6)
+      setPengurusForm(prev => ({ ...prev, photo: compressed }))
     }
     reader.readAsDataURL(file)
   }
@@ -441,22 +411,12 @@ function App() {
       alert('Nama Pengurus wajib diisi')
       return
     }
-
     const pengurusLama = siteContent.pengurus || []
     const pengurusBaru = pengurusLama.filter(p => p.jabatan !== pengurusForm.jabatan)
-
     pengurusBaru.push({
-      id: Date.now().toString(),
-      jabatan: pengurusForm.jabatan,
-      nama: pengurusForm.nama,
-      photo: pengurusForm.photo
+      id: Date.now().toString(), jabatan: pengurusForm.jabatan, nama: pengurusForm.nama, photo: pengurusForm.photo
     })
-
-    const newContent = {
-      ...siteContent,
-      pengurus: pengurusBaru
-    }
-
+    const newContent = { ...siteContent, pengurus: pengurusBaru }
     setSiteContent(newContent)
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
 
@@ -465,10 +425,7 @@ function App() {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          action: 'updateContent',
-          data: newContent
-        })
+        body: JSON.stringify({ action: 'updateContent', data: newContent })
       })
       alert('Data Pengurus berhasil disimpan')
     } catch (error) {
@@ -492,18 +449,11 @@ function App() {
       alert('Nama Umat wajib diisi.');
       return;
     }
-
     setIsSubmittingUserForm(true);
     try {
-      const verificationRecord: UmatRecord = {
-        ...userUmatForm,
-        id: 'verify_' + Date.now(),
-        isPending: true
-      };
-
+      const verificationRecord: UmatRecord = { ...userUmatForm, id: 'verify_' + Date.now(), isPending: true };
       const newUmatList = [...siteContent.umat, verificationRecord];
       const newContent = { ...siteContent, umat: newUmatList };
-
       setSiteContent(newContent);
       localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
@@ -514,7 +464,6 @@ function App() {
         headers: { 'Content-Type': 'text/plain' },
         body: payload
       });
-
       setUserSubmitMessage('Data berhasil dikirim untuk di verifikasi admin IMKKSA');
       setShowUserForm(false);
       setUserUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
@@ -529,155 +478,55 @@ function App() {
   const renderDataAnggota = () => {
     const officialAnggota = siteContent.umat.filter(u => !u.isPending);
     const pendingAnggota = siteContent.umat.filter(u => u.isPending);
-
     return (
       <div className="page-card">
         {isLoggedIn ? <h2>Data Anggota & Statistik</h2> : <h2>Data Anggota</h2>}
-
         {isLoggedIn ? (
           <div className="admin-data-section">
             <div className="admin-data-form">
               <h3>Form Input Data Anggota</h3>
               <div className="form-grid">
-                <div className="form-group">
-                  <label>Nama Anggota:</label>
-                  <input type="text" value={umatForm.nama} onChange={e => setUmatForm({ ...umatForm, nama: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>NIK:</label>
-                  <input type="text" value={umatForm.nik} onChange={e => setUmatForm({ ...umatForm, nik: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>No. HP:</label>
-                  <input type="text" value={umatForm.noHp} onChange={e => setUmatForm({ ...umatForm, noHp: e.target.value })} />
-                </div>
-                <div className="form-group full-width">
-                  <label>Alamat:</label>
-                  <textarea value={umatForm.alamat} onChange={e => setUmatForm({ ...umatForm, alamat: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Upload Photo (Maksimal 5 MB):</label>
-                  <input type="file" accept="image/*" onChange={e => handleUmatFile(e, 'photo')} />
-                </div>
-                <div className="form-group">
-                  <label>Upload KK (Kartu Keluarga - Maksimal 5 MB):</label>
-                  <input type="file" accept="image/*" onChange={e => handleUmatFile(e, 'kk')} />
-                </div>
+                <div className="form-group"><label>Nama Anggota:</label><input type="text" value={umatForm.nama} onChange={e => setUmatForm({ ...umatForm, nama: e.target.value })} /></div>
+                <div className="form-group"><label>NIK:</label><input type="text" value={umatForm.nik} onChange={e => setUmatForm({ ...umatForm, nik: e.target.value })} /></div>
+                <div className="form-group"><label>No. HP:</label><input type="text" value={umatForm.noHp} onChange={e => setUmatForm({ ...umatForm, noHp: e.target.value })} /></div>
+                <div className="form-group full-width"><label>Alamat:</label><textarea value={umatForm.alamat} onChange={e => setUmatForm({ ...umatForm, alamat: e.target.value })} /></div>
+                <div className="form-group"><label>Upload Photo (Maksimal 5 MB):</label><input type="file" accept="image/*" onChange={e => handleUmatFile(e, 'photo')} /></div>
+                <div className="form-group"><label>Upload KK (Kartu Keluarga - Maksimal 5 MB):</label><input type="file" accept="image/*" onChange={e => handleUmatFile(e, 'kk')} /></div>
               </div>
-
               <div className="photo-previews">
-                {umatForm.photo && (
-                  <div className="photo-preview-item">
-                    <img src={umatForm.photo} alt="Anggota" />
-                    <span>Photo</span>
-                  </div>
-                )}
-                {umatForm.kk && (
-                  <div className="photo-preview-item">
-                    <img src={umatForm.kk} alt="KK" />
-                    <span>KK</span>
-                  </div>
-                )}
+                {umatForm.photo && <div className="photo-preview-item"><img src={umatForm.photo} alt="Anggota" /><span>Photo</span></div>}
+                {umatForm.kk && <div className="photo-preview-item"><img src={umatForm.kk} alt="KK" /><span>KK</span></div>}
               </div>
-
               <div className="search-box" style={{ marginTop: '25px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                <input
-                  type="text"
-                  placeholder="Cari Nama untuk Edit Data..."
-                  value={adminSearch}
-                  onChange={e => onAdminSearch(e.target.value)}
-                />
+                <input type="text" placeholder="Cari Nama untuk Edit Data..." value={adminSearch} onChange={e => onAdminSearch(e.target.value)} />
               </div>
               <div className="admin-action-buttons">
                 <button className="btn-save" onClick={handleSaveUmat}>SIMPAN / PERBAHARUI DATA ANGGOTA</button>
-                {officialAnggota.some(u => u.nama.toLowerCase() === (umatForm.nama || '').toLowerCase()) && (
-                  <button className="btn-delete" onClick={() => handleDeleteUmat()}>HAPUS DATA</button>
-                )}
+                {officialAnggota.some(u => u.nama.toLowerCase() === (umatForm.nama || '').toLowerCase()) && (<button className="btn-delete" onClick={() => handleDeleteUmat()}>HAPUS DATA</button>)}
               </div>
             </div>
-
             <div className="admin-umat-list" style={{ marginTop: '40px' }}>
               <h3>Daftar Seluruh Data Anggota</h3>
               <div className="table-responsive">
                 <table className="umat-table admin-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Nama Anggota</th>
-                      <th>NIK</th>
-                      <th>No. HP</th>
-                      <th>Aksi</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>No</th><th>Nama Anggota</th><th>NIK</th><th>No. HP</th><th>Aksi</th></tr></thead>
                   <tbody>
                     {officialAnggota.length > 0 ? officialAnggota.map((u, idx) => (
-                      <tr key={u.id}>
-                        <td>{idx + 1}</td>
-                        <td>{u.nama}</td>
-                        <td>{u.nik || '-'}</td>
-                        <td>{u.noHp || '-'}</td>
-                        <td>
-                          <div className="table-actions">
-                            <button className="btn-edit-small" onClick={() => onEditUmat(u)}>Edit</button>
-                            <button className="btn-delete-small" onClick={() => handleDeleteUmat(u.nama)}>Hapus</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={5} style={{ textAlign: 'center' }}>Belum ada data anggota.</td>
-                      </tr>
-                    )}
+                      <tr key={u.id}><td>{idx + 1}</td><td>{u.nama}</td><td>{u.nik || '-'}</td><td>{u.noHp || '-'}</td><td><div className="table-actions"><button className="btn-edit-small" onClick={() => onEditUmat(u)}>Edit</button><button className="btn-delete-small" onClick={() => handleDeleteUmat(u.nama)}>Hapus</button></div></td></tr>
+                    )) : <tr><td colSpan={5} style={{ textAlign: 'center' }}>Belum ada data anggota.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-
             <div className="admin-verification-list" style={{ marginTop: '50px', borderTop: '2px solid var(--secondary-color)', paddingTop: '30px' }}>
-              <h3 style={{ color: 'var(--primary-color)' }}>Antrean Revisi / Update Mandiri</h3>
-              <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>
-                Berikut adalah data yang diisi secara mandiri oleh anggota dan memerlukan verifikasi Admin.
-              </p>
+              <h3>Antrean Revisi / Update Mandiri</h3>
               <div className="table-responsive">
                 <table className="umat-table admin-table">
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Nama Anggota</th>
-                      <th>Aksi</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>No</th><th>Nama Anggota</th><th>Aksi</th></tr></thead>
                   <tbody>
                     {pendingAnggota.length > 0 ? pendingAnggota.map((u, idx) => (
-                      <tr key={u.id}>
-                        <td>{idx + 1}</td>
-                        <td style={{ fontWeight: '600' }}>{u.nama}</td>
-                        <td>
-                          <div className="table-actions">
-                            <button
-                              className="btn-save"
-                              style={{ padding: '6px 15px', fontSize: '0.8rem' }}
-                              onClick={() => handleApproveUmat(u)}
-                            >
-                              Simpan
-                            </button>
-                            <button
-                              className="btn-delete"
-                              style={{ padding: '6px 15px', fontSize: '0.8rem', marginLeft: '8px' }}
-                              onClick={() => handleRejectUmat(u.id)}
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
-                          Tidak ada antrean revisi mandiri saat ini.
-                        </td>
-                      </tr>
-                    )}
+                      <tr key={u.id}><td>{idx + 1}</td><td style={{ fontWeight: '600' }}>{u.nama}</td><td><div className="table-actions"><button className="btn-save" style={{ padding: '6px 15px', fontSize: '0.8rem' }} onClick={() => handleApproveUmat(u)}>Simpan</button><button className="btn-delete" style={{ padding: '6px 15px', fontSize: '0.8rem', marginLeft: '8px' }} onClick={() => handleRejectUmat(u.id)}>Hapus</button></div></td></tr>
+                    )) : <tr><td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>Tidak ada antrean revisi mandiri saat ini.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -686,167 +535,41 @@ function App() {
         ) : (
           <div className="user-data-section">
             <div className="user-search-container" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <input
-                type="text"
-                placeholder="Cari Nama Anggota..."
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
-              />
+              <input type="text" placeholder="Cari Nama Anggota..." value={userSearch} onChange={e => setUserSearch(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} />
               <button className="btn-save" onClick={handleUserSearch} style={{ padding: '0 30px' }}>CARI</button>
             </div>
-
             {hasUserSearched && (
               <div className="search-results-section">
                 <div className="table-responsive">
                   <table className="umat-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>NAMA ANGGOTA</th>
-                      </tr>
-                    </thead>
+                    <thead><tr><th>No</th><th>NAMA ANGGOTA</th></tr></thead>
                     <tbody>
                       {userSearchResults.length > 0 ? userSearchResults.map((result, idx) => (
-                        <tr key={result.id}>
-                          <td>{idx + 1}</td>
-                          <td>
-                            {result.nama}
-                            <div style={{ marginTop: '8px' }}>
-                              <button
-                                className="btn-edit-small"
-                                onClick={() => {
-                                  setUserUmatForm({ ...result });
-                                  setShowUserForm(true);
-                                  setUserSubmitMessage(null);
-                                }}
-                              >
-                                revisi
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={2} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
-                            Data Tidak Ditemukan
-                          </td>
-                        </tr>
-                      )}
+                        <tr key={result.id}><td>{idx + 1}</td><td>{result.nama}<div style={{ marginTop: '8px' }}><button className="btn-edit-small" onClick={() => { setUserUmatForm({ ...result }); setShowUserForm(true); setUserSubmitMessage(null); }}>revisi</button></div></td></tr>
+                      )) : <tr><td colSpan={2} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>Data Tidak Ditemukan</td></tr>}
                     </tbody>
                   </table>
                 </div>
-
                 {userSearchResults.length === 0 && (
-                  <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                    <button
-                      className="btn-save"
-                      onClick={() => {
-                        setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
-                        setShowUserForm(true);
-                        setUserSubmitMessage(null);
-                      }}
-                    >
-                      Isi secara mandiri
-                    </button>
-                  </div>
+                  <div style={{ textAlign: 'center', marginTop: '20px' }}><button className="btn-save" onClick={() => { setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' }); setShowUserForm(true); setUserSubmitMessage(null); }}>Isi secara mandiri</button></div>
                 )}
               </div>
             )}
-
             {showUserForm && (
               <div className="user-input-form" style={{ marginTop: '40px', padding: '25px', background: '#f9f9f9', borderRadius: '12px', border: '1px solid #eee' }}>
-                <h3 style={{ marginBottom: '20px', color: 'var(--nav-bg)' }}>Lengkapi Data Anggota</h3>
+                <h3>Lengkapi Data Anggota</h3>
                 <div className="form-grid">
-                  <div className="form-group">
-                    <label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label>
-                    <input
-                      type="text"
-                      value={userUmatForm.nama}
-                      onChange={e => setUserUmatForm({ ...userUmatForm, nama: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>NIK:</label>
-                    <input type="text" value={userUmatForm.nik} onChange={e => setUserUmatForm({ ...userUmatForm, nik: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>No. HP:</label>
-                    <input type="text" value={userUmatForm.noHp} onChange={e => setUserUmatForm({ ...userUmatForm, noHp: e.target.value })} />
-                  </div>
-                  <div className="form-group full-width">
-                    <label>Alamat:</label>
-                    <textarea value={userUmatForm.alamat} onChange={e => setUserUmatForm({ ...userUmatForm, alamat: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>Upload Photo (Maksimal 5 MB):</label>
-                    <input type="file" accept="image/*" onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (file.size > 5 * 1024 * 1024) {
-                          alert('File terlalu besar! Maksimal ukuran file adalah 5 MB.');
-                          e.target.value = '';
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onloadend = async () => {
-                          const base64 = reader.result as string;
-                          const compressed = await compressImage(base64);
-                          setUserUmatForm({ ...userUmatForm, photo: compressed });
-                        }
-                        reader.readAsDataURL(file);
-                      }
-                    }} />
-                  </div>
-                  <div className="form-group">
-                    <label>Upload KK (Kartu Keluarga - Maksimal 5 MB):</label>
-                    <input type="file" accept="image/*" onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (file.size > 5 * 1024 * 1024) {
-                          alert('File terlalu besar! Maksimal ukuran file adalah 5 MB.');
-                          e.target.value = '';
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onloadend = async () => {
-                          const base64 = reader.result as string;
-                          const compressed = await compressImage(base64);
-                          setUserUmatForm({ ...userUmatForm, kk: compressed });
-                        }
-                        reader.readAsDataURL(file);
-                      }
-                    }} />
-                  </div>
+                  <div className="form-group"><label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label><input type="text" value={userUmatForm.nama} onChange={e => setUserUmatForm({ ...userUmatForm, nama: e.target.value })} required /></div>
+                  <div className="form-group"><label>NIK:</label><input type="text" value={userUmatForm.nik} onChange={e => setUserUmatForm({ ...userUmatForm, nik: e.target.value })} /></div>
+                  <div className="form-group"><label>No. HP:</label><input type="text" value={userUmatForm.noHp} onChange={e => setUserUmatForm({ ...userUmatForm, noHp: e.target.value })} /></div>
+                  <div className="form-group full-width"><label>Alamat:</label><textarea value={userUmatForm.alamat} onChange={e => setUserUmatForm({ ...userUmatForm, alamat: e.target.value })} /></div>
+                  <div className="form-group"><label>Upload Photo (Maksimal 5 MB):</label><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const compressed = await compressImage(base64, 800, 0.6); setUserUmatForm({ ...userUmatForm, photo: compressed }); }; reader.readAsDataURL(file); } }} /></div>
+                  <div className="form-group"><label>Upload KK (Kartu Keluarga - Maksimal 5 MB):</label><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const compressed = await compressImage(base64, 800, 0.6); setUserUmatForm({ ...userUmatForm, kk: compressed }); }; reader.readAsDataURL(file); } }} /></div>
                 </div>
-
-                <div style={{ textAlign: 'center', marginTop: '30px' }}>
-                  <button
-                    className="btn-save"
-                    onClick={handleUserFormSubmit}
-                    disabled={isSubmittingUserForm}
-                  >
-                    {isSubmittingUserForm ? 'Mengirim...' : 'KIRIM'}
-                  </button>
-                </div>
+                <div style={{ textAlign: 'center', marginTop: '30px' }}><button className="btn-save" onClick={handleUserFormSubmit} disabled={isSubmittingUserForm}>{isSubmittingUserForm ? 'Mengirim...' : 'KIRIM'}</button></div>
               </div>
             )}
-
-            {userSubmitMessage && (
-              <div style={{
-                marginTop: '25px',
-                padding: '15px',
-                backgroundColor: '#e8f5e9',
-                color: '#2e7d32',
-                borderRadius: '8px',
-                textAlign: 'center',
-                fontWeight: '600',
-                border: '1px solid #c8e6c9'
-              }}>
-                {userSubmitMessage}
-              </div>
-            )}
+            {userSubmitMessage && <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: '600', border: '1px solid #c8e6c9' }}>{userSubmitMessage}</div>}
           </div>
         )}
       </div>
@@ -855,7 +578,6 @@ function App() {
 
   const renderPengurus = () => {
     const pengurusList = siteContent.pengurus || []
-
     if (!isLoggedIn) {
       return (
         <div className="page-content">
@@ -863,15 +585,8 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && (
-                  <img
-                    src={p.photo}
-                    alt={p.nama}
-                    className="pengurus-photo"
-                  />
-                )}
-                <h3>{p.jabatan}</h3>
-                <p>{p.nama}</p>
+                {p.photo && <img src={p.photo} alt={p.nama} className="pengurus-photo" />}
+                <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}
           </div>
@@ -883,45 +598,15 @@ function App() {
           <h2>Kelola Pengurus</h2>
           <div className="form-section">
             <label>Jabatan</label>
-            <select
-              value={pengurusForm.jabatan}
-              onChange={e => setPengurusForm({ ...pengurusForm, jabatan: e.target.value })}
-            >
-              <option value="Ketua">Ketua</option>
-              <option value="Wakil Ketua">Wakil Ketua</option>
-              <option value="Sekretaris">Sekretaris</option>
-              <option value="Wakil Sekretaris">Wakil Sekretaris</option>
-              <option value="Bendahara">Bendahara</option>
-              <option value="Wakil Bendahara">Wakil Bendahara</option>
+            <select value={pengurusForm.jabatan} onChange={e => setPengurusForm({ ...pengurusForm, jabatan: e.target.value })}>
+              <option value="Ketua">Ketua</option><option value="Wakil Ketua">Wakil Ketua</option><option value="Sekretaris">Sekretaris</option><option value="Wakil Sekretaris">Wakil Sekretaris</option><option value="Bendahara">Bendahara</option><option value="Wakil Bendahara">Wakil Bendahara</option>
             </select>
-
-            <label>Nama</label>
-            <input
-              type="text"
-              value={pengurusForm.nama}
-              onChange={e => setPengurusForm({ ...pengurusForm, nama: e.target.value })}
-            />
-
-            <label>Foto</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePengurusPhoto}
-            />
-
-            <button className="btn-save" onClick={handleSavePengurus}>
-              Simpan Pengurus
-            </button>
+            <label>Nama</label><input type="text" value={pengurusForm.nama} onChange={e => setPengurusForm({ ...pengurusForm, nama: e.target.value })} />
+            <label>Foto</label><input type="file" accept="image/*" onChange={handlePengurusPhoto} />
+            <button className="btn-save" onClick={handleSavePengurus}>Simpan Pengurus</button>
           </div>
-
           <h3>Data Pengurus Saat Ini</h3>
-          <ul>
-            {pengurusList.map(p => (
-              <li key={p.id}>
-                {p.jabatan}: {p.nama}
-              </li>
-            ))}
-          </ul>
+          <ul>{pengurusList.map(p => <li key={p.id}>{p.jabatan}: {p.nama}</li>)}</ul>
         </div>
       )
     }
@@ -929,23 +614,10 @@ function App() {
 
   const renderPage = () => {
     if (activeTab === 'Login' && !isLoggedIn) {
-      return (
-        <LoginForm
-          onLoginSuccess={() => {
-            setIsLoggedIn(true)
-            setActiveTab('Beranda')
-          }}
-        />
-      )
+      return <LoginForm onLoginSuccess={() => { setIsLoggedIn(true); setActiveTab('Beranda'); }} />
     }
-
-    if (activeTab === 'Data Anggota') {
-      return renderDataAnggota()
-    }
-
-    if (activeTab === 'Pengurus') {
-      return renderPengurus()
-    }
+    if (activeTab === 'Data Anggota') return renderDataAnggota()
+    if (activeTab === 'Pengurus') return renderPengurus()
 
     const currentPage = siteContent.pages[activeTab]
     if (!currentPage) return null
@@ -955,13 +627,7 @@ function App() {
         {!isLoggedIn ? (
           <div className="page-card">
             <h2>{currentPage.title}</h2>
-            <div
-              className="content-body"
-              dangerouslySetInnerHTML={{
-                __html: (currentPage.content || '').replace(/&nbsp;/g, ' ')
-              }}
-            />
-
+            <div className="content-body" dangerouslySetInnerHTML={{ __html: (currentPage.content || '').replace(/&nbsp;/g, ' ') }} />
             {activeTab === 'Beranda' && siteContent.settings.berandaPdf && (
               <div className="pdf-viewer-section" style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
                 {!showPdfReader ? (
@@ -969,16 +635,7 @@ function App() {
                 ) : (
                   <div className="pdf-reader-container">
                     <button className="btn-delete" onClick={() => setShowPdfReader(false)} style={{ marginBottom: '10px' }}>Tutup PDF</button>
-                    <iframe
-                      src={`${siteContent.settings.berandaPdf}#toolbar=0`}
-                      width="100%"
-                      height="600px"
-                      style={{ border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      title="PDF Viewer"
-                    ></iframe>
-                    <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '10px', fontStyle: 'italic' }}>
-                      Catatan: Download dinonaktifkan untuk pengunjung umum.
-                    </p>
+                    <iframe src={`${siteContent.settings.berandaPdf}#toolbar=0`} width="100%" height="600px" style={{ border: 'none', borderRadius: '8px' }} title="PDF Viewer"></iframe>
                   </div>
                 )}
               </div>
@@ -986,20 +643,9 @@ function App() {
           </div>
         ) : (
           <AdminDashboard
-            initialTitle={editTitle || ''}
-            initialContent={editContent || ''}
-            initialSiteTitle={editSiteTitle || ''}
-            initialSiteLogo={editLogo || ''}
-            initialBerandaPdf={editBerandaPdf || ''}
-            onSave={(data: any) => {
-              setEditTitle(data.title || '');
-              setEditContent(data.content || '');
-              setEditSiteTitle(data.siteTitle || '');
-              setEditLogo(data.siteLogo || '');
-              setEditBerandaPdf(data.berandaPdf || '');
-            }}
-            onPublish={(data: any) => saveChanges(data)}
-            isSaving={isSaving}
+            initialTitle={editTitle || ''} initialContent={editContent || ''} initialSiteTitle={editSiteTitle || ''} initialSiteLogo={editLogo || ''} initialBerandaPdf={editBerandaPdf || ''}
+            onSave={(data: any) => { setEditTitle(data.title || ''); setEditContent(data.content || ''); setEditSiteTitle(data.siteTitle || ''); setEditLogo(data.siteLogo || ''); setEditBerandaPdf(data.berandaPdf || ''); }}
+            onPublish={(data: any) => saveChanges(data)} isSaving={isSaving}
           />
         )}
       </div>
@@ -1009,9 +655,7 @@ function App() {
   if (isLoading) {
     return (
       <div className="loading-screen">
-        <div className="loading-logo-container">
-          <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
-        </div>
+        <div className="loading-logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" /></div>
         <p>Membuka situs IMKKSA Banda Aceh Sekitar...</p>
       </div>
     )
@@ -1020,63 +664,25 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <div className="logo-container">
-          <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" />
-        </div>
+        <div className="logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" /></div>
         <h1>{siteContent.settings.title}</h1>
       </header>
-
       <nav className="navbar">
-        <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? '✕' : '☰'} Menu
-        </div>
+        <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? '✕' : '☰'} Menu</div>
         <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-          <li
-            className={activeTab === 'Beranda' ? 'active' : ''}
-            onClick={() => { setActiveTab('Beranda'); setIsMobileMenuOpen(false); }}
-          >
-            Beranda
-          </li>
-          <li
-            className={activeTab === 'Jadwal Keluarga' ? 'active' : ''}
-            onClick={() => { setActiveTab('Jadwal Keluarga'); setIsMobileMenuOpen(false); }}
-          >
-            Jadwal Keluarga
-          </li>
-          <li
-            className={activeTab === 'Data Anggota' ? 'active' : ''}
-            onClick={() => { setActiveTab('Data Anggota'); setIsMobileMenuOpen(false); }}
-          >
-            Data Anggota
-          </li>
-          <li
-            className={activeTab === 'Pengurus' ? 'active' : ''}
-            onClick={() => { setActiveTab('Pengurus'); setIsMobileMenuOpen(false); }}
-          >
-            Pengurus
-          </li>
+          <li className={activeTab === 'Beranda' ? 'active' : ''} onClick={() => setActiveTab('Beranda')}>Beranda</li>
+          <li className={activeTab === 'Jadwal Keluarga' ? 'active' : ''} onClick={() => setActiveTab('Jadwal Keluarga')}>Jadwal Keluarga</li>
+          <li className={activeTab === 'Data Anggota' ? 'active' : ''} onClick={() => setActiveTab('Data Anggota')}>Data Anggota</li>
+          <li className={activeTab === 'Pengurus' ? 'active' : ''} onClick={() => setActiveTab('Pengurus')}>Pengurus</li>
           {isLoggedIn ? (
-            <li onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}>
-              Logout (Admin)
-            </li>
+            <li onClick={handleLogout}>Logout (Admin)</li>
           ) : (
-            <li
-              className={activeTab === 'Login' ? 'active' : ''}
-              onClick={() => { setActiveTab('Login'); setIsMobileMenuOpen(false); }}
-            >
-              Login
-            </li>
+            <li className={activeTab === 'Login' ? 'active' : ''} onClick={() => setActiveTab('Login')}>Login</li>
           )}
         </ul>
       </nav>
-
-      <main className="main-content">
-        {renderPage()}
-      </main>
-
-      <footer className="footer">
-        &copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.
-      </footer>
+      <main className="main-content">{renderPage()}</main>
+      <footer className="footer">&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</footer>
     </div>
   )
 }
