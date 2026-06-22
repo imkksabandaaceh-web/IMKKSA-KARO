@@ -29,6 +29,7 @@ interface SiteSettings {
   logo: string;
   title: string;
   berandaPdf?: string;
+  pengurusRaw?: string;
 }
 
 interface UmatRecord {
@@ -94,11 +95,22 @@ function App() {
           migratedPages['Jadwal Keluarga'] = migratedPages['Jadwal Ibadah'];
           delete migratedPages['Jadwal Ibadah'];
         }
+        
+        let loadedPengurus = parsed.pengurus || [];
+        if (parsed.settings && parsed.settings.pengurusRaw) {
+          try {
+            loadedPengurus = JSON.parse(parsed.settings.pengurusRaw);
+          } catch (e) {
+            console.error("Gagal parse pengurusRaw:", e);
+          }
+        }
+
         return {
           ...DEFAULT_CONTENT,
           ...parsed,
           pages: { ...DEFAULT_CONTENT.pages, ...migratedPages },
-          proposals: parsed.proposals || []
+          proposals: parsed.proposals || [],
+          pengurus: loadedPengurus
         }
       } catch (e) {
         return DEFAULT_CONTENT
@@ -165,15 +177,24 @@ function App() {
           }
         });
 
-        const mergedContent = {
-          ...siteContent,
-          settings: data.settings ? { ...DEFAULT_CONTENT.settings, ...data.settings } : siteContent.settings,
-          pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : siteContent.pages,
-          umat: (data.umat && data.umat.length > 0) ? data.umat : siteContent.umat,
-          pengurus: data.pengurus ? data.pengurus : siteContent.pengurus
-        }
-
         setSiteContent(prev => {
+          let currentParsedPengurus = prev.pengurus;
+          if (data.settings && data.settings.pengurusRaw) {
+            try {
+              currentParsedPengurus = JSON.parse(data.settings.pengurusRaw);
+            } catch (e) {
+              console.error("Gagal parse pengurusRaw:", e);
+            }
+          }
+
+          const mergedContent = {
+            ...prev,
+            settings: data.settings ? { ...DEFAULT_CONTENT.settings, ...data.settings } : prev.settings,
+            pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : prev.pages,
+            umat: (data.umat && data.umat.length > 0) ? data.umat : prev.umat,
+            pengurus: currentParsedPengurus
+          }
+
           const isSameUmat = JSON.stringify(prev.umat) === JSON.stringify(mergedContent.umat);
           const isSamePages = JSON.stringify(prev.pages) === JSON.stringify(mergedContent.pages);
           const isSameSettings = JSON.stringify(prev.settings) === JSON.stringify(mergedContent.settings);
@@ -226,7 +247,12 @@ function App() {
 
     const newContent = {
       ...siteContent,
-      settings: { logo: finalLogo, title: finalSiteTitle, berandaPdf: finalBerandaPdf },
+      settings: { 
+        logo: finalLogo, 
+        title: finalSiteTitle, 
+        berandaPdf: finalBerandaPdf,
+        pengurusRaw: siteContent.settings.pengurusRaw
+      },
       pages: {
         ...siteContent.pages,
         [activeTab]: { title: finalTitle, content: finalContent }
@@ -417,7 +443,18 @@ function App() {
     pengurusBaru.push({
       id: Date.now().toString(), jabatan: pengurusForm.jabatan, nama: pengurusForm.nama, photo: pengurusForm.photo
     })
-    const newContent = { ...siteContent, pengurus: pengurusBaru }
+    
+    const newSettings = {
+      ...siteContent.settings,
+      pengurusRaw: JSON.stringify(pengurusBaru)
+    }
+
+    const newContent = { 
+      ...siteContent, 
+      settings: newSettings,
+      pengurus: pengurusBaru 
+    }
+    
     setSiteContent(newContent)
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
 
