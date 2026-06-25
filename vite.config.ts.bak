@@ -1,0 +1,73 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+
+  build: {
+    // Target modern browsers untuk output lebih kecil
+    target: 'es2020',
+
+    chunkSizeWarningLimit: 600,
+
+    rollupOptions: {
+      output: {
+        // Manual chunking: pisahkan vendor besar agar browser bisa cache terpisah
+        manualChunks: {
+          // React core
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+
+          // Supabase (pisah karena jarang berubah)
+          'vendor-supabase': ['@supabase/supabase-js', '@supabase/ssr'],
+
+          // Editor
+          'vendor-editor': ['react-quill-new'],
+        },
+
+        // Naming pattern untuk cache busting
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+      },
+    },
+
+    // Minifikasi optimal
+    minify: 'esbuild',
+    sourcemap: false, // false di production untuk ukuran lebih kecil
+  },
+
+  // Optimasi dependency pre-bundling saat dev
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@supabase/supabase-js',
+      '@supabase/ssr',
+      'react-quill-new',
+    ],
+  },
+
+  // Server config untuk localhost
+  server: {
+    port: 5173,
+    open: true,
+    hmr: {
+      overlay: true,
+    },
+  },
+
+  // Preview server (npm run preview)
+  preview: {
+    port: 4173,
+    open: true,
+  },
+})

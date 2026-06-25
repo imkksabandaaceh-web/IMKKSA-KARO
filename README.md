@@ -1,73 +1,84 @@
-# React + TypeScript + Vite
+# Karo — Panduan Penerapan File Bersih (Tanpa PDF)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## File yang diperbarui
 
-Currently, two official plugins are available:
+| File | Lokasi di project | Perubahan |
+|------|-------------------|-----------|
+| `App.tsx` | `src/App.tsx` | Hapus PDF reader, download PDF, lacak PDF, DownloadProposal, PdfLoadingSpinner, proposal handlers, `berandaPdf` state |
+| `package.json` | `package.json` (root) | Hapus `pdf-lib`, `@pdf-lib/fontkit`, `pdfjs-dist` |
+| `vite.config.ts` | `vite.config.ts` (root) | Hapus chunk `vendor-pdf`, hapus exclude `pdfjs-dist` dari optimizeDeps |
+| `deploy.sh` | `deploy.sh` (root) | Script otomatis untuk localhost & GitHub |
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Cara Menggunakan
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 1. Copy file ke project Anda
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Dari folder hasil download ini, copy ke project karo/:
+cp App.tsx       /path/to/karo/src/App.tsx
+cp package.json  /path/to/karo/package.json
+cp vite.config.ts /path/to/karo/vite.config.ts
+cp deploy.sh     /path/to/karo/deploy.sh
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Beri izin eksekusi pada deploy.sh
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd /path/to/karo
+chmod +x deploy.sh
 ```
+
+### 3. Jalankan script deploy
+
+```bash
+./deploy.sh
+```
+
+Script akan menanyakan pilihan:
+- **[1]** → Jalankan di localhost (`http://localhost:5173`)
+- **[2]** → Build + `git push origin master`
+- **[3]** → Localhost dulu, lalu push ke GitHub
+
+---
+
+## Cara Manual (tanpa script)
+
+### Jalankan di localhost
+
+```bash
+cd /path/to/karo
+npm install          # install ulang (hapus node_modules PDF lama)
+npm run dev          # buka http://localhost:5173
+```
+
+### Push ke GitHub
+
+```bash
+cd /path/to/karo
+npm run build        # pastikan build berhasil dulu
+git add .
+git commit -m "hapus fitur PDF - bersihkan dependensi"
+git push origin master
+```
+
+---
+
+## Yang Dihapus
+
+- `DownloadProposal` component (lazy load)
+- `PdfLoadingSpinner` component
+- `handleAddProposal`, `handleEditProposal`, `handleDeleteProposal`
+- State `editBerandaPdf` dan `berandaPdf` di `SiteSettings`
+- `proposals` dari `FullContent` dan `DEFAULT_CONTENT`
+- Import `Suspense`, `lazy` dari React
+- Semua referensi PDF di tab Beranda dan Jadwal Keluarga
+- Dependensi: `pdf-lib`, `@pdf-lib/fontkit`, `pdfjs-dist`
+- Chunk `vendor-pdf` di vite.config.ts
+
+## Estimasi Penghematan Bundle
+
+| Sebelum | Sesudah |
+|---------|---------|
+| ~3.8 MB+ (dengan PDF libs) | ~600 KB (tanpa PDF) |
