@@ -114,7 +114,10 @@ function App() {
     return DEFAULT_CONTENT
   })
 
-  const [isLoading, setIsLoading] = useState(true)
+  // Langsung tampil jika ada cache localStorage, fetch GScript di background
+  const [isLoading, setIsLoading] = useState(() => {
+    return !localStorage.getItem('imkksaSiteContent')
+  })
 
   // Editor states
   const [editTitle, setEditTitle] = useState('')
@@ -603,7 +606,7 @@ function App() {
           </div>
         ) : (
           <AdminDashboard
-            initialTitle={editTitle || ''} initialContent={editContent || ''} initialSiteTitle={editSiteTitle || ''} initialSiteLogo={editLogo || ''} initialBerandaPdf=""
+            initialTitle={editTitle || ''} initialContent={editContent || ''} initialSiteTitle={editSiteTitle || ''} initialSiteLogo={editLogo || ''}
             onSave={(data: any) => { setEditTitle(data.title || ''); setEditContent(data.content || ''); setEditSiteTitle(data.siteTitle || ''); setEditLogo(data.siteLogo || ''); }}
             onPublish={(data: any) => saveChanges(data)} isSaving={isSaving}
           />

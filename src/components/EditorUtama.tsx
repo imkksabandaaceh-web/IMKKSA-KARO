@@ -9,10 +9,9 @@ interface EditorUtamaProps {
   setTitle: (title: string) => void;
   content: string;
   setContent: (content: string) => void;
-  berandaPdf?: string;
 }
 
-const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, setContent, berandaPdf }) => {
+const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, setContent }) => {
   const quillRef = useRef<ReactQuill>(null);
 
   const imageHandler = () => {
@@ -27,7 +26,6 @@ const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, set
         const reader = new FileReader();
         reader.onload = async () => {
           const base64 = reader.result as string;
-          // Kompres gambar sebelum dimasukkan ke editor
           const compressed = await compressImage(base64, 800, 0.7);
 
           const quill = quillRef.current?.getEditor();
@@ -56,17 +54,17 @@ const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, set
   return (
     <div className="editor-utama">
       <div className="editor-title-container">
-        <input 
-          type="text" 
-          className="editor-title-input" 
-          placeholder="Judul Materi" 
+        <input
+          type="text"
+          className="editor-title-input"
+          placeholder="Judul Materi"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
       </div>
       <EditorToolbar />
       <div className="quill-wrapper">
-        <ReactQuill 
+        <ReactQuill
           ref={quillRef}
           theme="snow"
           value={content}
@@ -76,31 +74,6 @@ const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, set
           placeholder="Tulis materi di sini..."
         />
       </div>
-
-      {berandaPdf && (
-        <div className="admin-pdf-preview" style={{ marginTop: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
-          <h4>Preview PDF (Warta Jemaat):</h4>
-          <iframe 
-            src={berandaPdf} 
-            width="100%" 
-            height="400px" 
-            style={{ border: '1px solid #ccc', borderRadius: '4px' }}
-            title="Admin PDF Preview"
-          ></iframe>
-          <div style={{ marginTop: '15px' }}>
-            <a 
-              href={berandaPdf} 
-              download="Informasi_Anggota_IMKKSA.pdf" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="btn-save"
-              style={{ textDecoration: 'none', display: 'inline-block' }}
-            >
-              Download PDF (Admin)
-            </a>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
