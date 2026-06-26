@@ -12,7 +12,7 @@ const compressImage = async (
 }
 
 // Types
-type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Pengurus' | 'Data Anggota' | 'Login';
+type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -29,6 +29,15 @@ interface SiteSettings {
   logo: string;
   title: string;
   pengurusRaw?: string;
+}
+
+interface GaleriItem {
+  id: string;
+  judul: string;
+  keterangan?: string;
+  url: string;
+  driveId: string;
+  uploadedAt?: string;
 }
 
 interface UmatRecord {
@@ -55,9 +64,10 @@ interface FullContent {
   pages: Record<string, PageContent>;
   umat: UmatRecord[];
   pengurus: PengurusRecord[];
+  galeri: GaleriItem[];
 }
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnXm-7uc82ZXbcqLVp6wSDmhtelLbods2bHTHEjqov06jzTGf-eCXuXsDnzzGlFDBkTw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxFxkRqujCCzNzMhOfmWEnQ8JJKqMD7xgJptDLDzA5DhPC9pqDouzU8sliU0jr7onUk3w/exec';
 
 const DEFAULT_CONTENT: FullContent = {
   settings: {
@@ -75,7 +85,8 @@ const DEFAULT_CONTENT: FullContent = {
     }
   },
   umat: [],
-  pengurus: []
+  pengurus: [],
+  galeri: []
 };
 
 function App() {
@@ -105,7 +116,8 @@ function App() {
           ...DEFAULT_CONTENT,
           ...parsed,
           pages: { ...DEFAULT_CONTENT.pages, ...migratedPages },
-          pengurus: loadedPengurus
+          pengurus: loadedPengurus,
+          galeri: parsed.galeri || []
         }
       } catch (e) {
         return DEFAULT_CONTENT
@@ -130,6 +142,15 @@ function App() {
     nama: '',
     photo: ''
   })
+
+  // Galeri states
+  const [galeriJudul, setGaleriJudul] = useState('')
+  const [galeriKeterangan, setGaleriKeterangan] = useState('')
+  const [galeriFile, setGaleriFile] = useState<string | null>(null)
+  const [galeriFileName, setGaleriFileName] = useState('')
+  const [isUploadingFoto, setIsUploadingFoto] = useState(false)
+  const [galeriUploadMsg, setGaleriUploadMsg] = useState<string | null>(null)
+  const [galeriPreview, setGaleriPreview] = useState<string | null>(null)
 
   // Data Anggota states
   const [userSearch, setUserSearch] = useState('')
@@ -188,7 +209,8 @@ function App() {
             settings: data.settings ? { ...DEFAULT_CONTENT.settings, ...data.settings } : prev.settings,
             pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : prev.pages,
             umat: (data.umat && data.umat.length > 0) ? data.umat : prev.umat,
-            pengurus: currentParsedPengurus
+            pengurus: currentParsedPengurus,
+            galeri: data.galeri || prev.galeri || []
           }
 
           const isSameUmat = JSON.stringify(prev.umat) === JSON.stringify(mergedContent.umat);
@@ -439,6 +461,219 @@ function App() {
     setPengurusForm({ jabatan: 'Ketua', nama: '', photo: '' });
   }
 
+  const handleUploadFoto = async () => {
+    if (!galeriJudul.trim()) { alert('Judul foto harus diisi.'); return; }
+    if (!galeriFile) { alert('Pilih foto terlebih dahulu.'); return; }
+
+    setIsUploadingFoto(true);
+    setGaleriUploadMsg('Mengunggah foto ke Google Drive...');
+
+    try {
+      // Simpan dulu ke localStorage sementara pakai URL preview lokal
+      const tempId = `temp_${Date.now()}`;
+      const newItem: GaleriItem = {
+        id: tempId,
+        judul: galeriJudul,
+        keterangan: galeriKeterangan,
+        url: galeriFile, // base64 sementara
+        driveId: tempId,
+        uploadedAt: new Date().toISOString()
+      };
+      const newGaleri = [...(siteContent.galeri || []), newItem];
+      const newContent = { ...siteContent, galeri: newGaleri };
+      setSiteContent(newContent);
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+
+      // Kirim ke Google Drive via Apps Script
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action     : 'uploadFoto',
+          base64     : galeriFile,
+          namaFile   : galeriFileName || `foto_${Date.now()}.jpg`,
+          judul      : galeriJudul,
+          keterangan : galeriKeterangan,
+          tempId     : tempId
+        }),
+      });
+
+      setGaleriUploadMsg('✅ Foto berhasil diunggah! Menunggu sinkronisasi...');
+      setGaleriJudul('');
+      setGaleriKeterangan('');
+      setGaleriFile(null);
+      setGaleriFileName('');
+      setGaleriPreview(null);
+
+      // Tunggu 5 detik lalu refresh dari server untuk dapat URL Drive yang benar
+      setTimeout(async () => {
+        await fetchData(true);
+        setGaleriUploadMsg('✅ Galeri berhasil diperbarui!');
+        setTimeout(() => setGaleriUploadMsg(null), 3000);
+      }, 5000);
+
+    } catch (err) {
+      setGaleriUploadMsg('❌ Gagal menghubungi server. Coba lagi.');
+      console.error(err);
+      setIsUploadingFoto(false);
+    } finally {
+      setIsUploadingFoto(false);
+    }
+  }
+
+  const handleDeleteGaleri = async (id: string) => {
+    if (!window.confirm('Hapus foto ini dari Galeri dan Google Drive?')) return;
+
+    // Hapus dari state dan localStorage dulu (langsung terasa)
+    const newGaleri = (siteContent.galeri || []).filter(g => g.id !== id);
+    const newContent = { ...siteContent, galeri: newGaleri };
+    setSiteContent(newContent);
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+
+    // Kirim perintah hapus ke Drive
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'hapusFoto', id }),
+      });
+      alert('Foto berhasil dihapus.');
+    } catch (error) {
+      console.error("Gagal hapus di Drive:", error);
+      alert('Foto dihapus dari tampilan. Sinkronisasi Drive mungkin tertunda.');
+    }
+  }
+
+  const handlePilihFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Ukuran foto maksimal 5 MB.'); return; }
+    setGaleriFileName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      const compressed = await compressImage(base64, 1200, 0.8);
+      setGaleriFile(compressed);
+      setGaleriPreview(compressed);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const renderGaleri = () => {
+    const galeriList = siteContent.galeri || [];
+    return (
+      <div className="page-content">
+        {isLoggedIn ? (
+          <div className="admin-data-section">
+            <h2>Kelola Galeri Foto</h2>
+            <div className="admin-data-form">
+              <h3>Upload Foto Baru</h3>
+              <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '15px', lineHeight: '1.6' }}>
+                📁 Foto akan tersimpan otomatis di <strong>Google Drive → Folder "Galeri IMKKSA"</strong> dan langsung tampil di situs.
+              </p>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Judul Foto <span style={{ color: 'red' }}>*</span>:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Pertemuan Keluarga Juli 2026"
+                    value={galeriJudul}
+                    onChange={e => setGaleriJudul(e.target.value)}
+                    disabled={isUploadingFoto}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Keterangan (opsional):</label>
+                  <input
+                    type="text"
+                    placeholder="Deskripsi singkat foto..."
+                    value={galeriKeterangan}
+                    onChange={e => setGaleriKeterangan(e.target.value)}
+                    disabled={isUploadingFoto}
+                  />
+                </div>
+                <div className="form-group full-width">
+                  <label>Pilih Foto (maks. 5 MB):</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePilihFoto}
+                    disabled={isUploadingFoto}
+                  />
+                </div>
+                {galeriPreview && (
+                  <div className="form-group full-width">
+                    <label>Pratinjau:</label>
+                    <img src={galeriPreview} alt="preview" style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #ddd' }} />
+                  </div>
+                )}
+              </div>
+              {galeriUploadMsg && (
+                <div style={{ margin: '10px 0', padding: '10px 15px', background: galeriUploadMsg.startsWith('✅') ? '#e8f5e9' : '#fff3e0', borderRadius: '8px', fontSize: '0.9rem', color: galeriUploadMsg.startsWith('✅') ? '#2e7d32' : '#e65100' }}>
+                  {galeriUploadMsg}
+                </div>
+              )}
+              <div className="admin-action-buttons">
+                <button className="btn-save" onClick={handleUploadFoto} disabled={isUploadingFoto}>
+                  {isUploadingFoto ? '⏳ Mengunggah...' : '📤 Upload ke Google Drive'}
+                </button>
+              </div>
+            </div>
+
+            <h3 style={{ marginTop: '30px' }}>Daftar Foto Galeri ({galeriList.length})</h3>
+            {galeriList.length === 0 ? (
+              <p style={{ color: '#888', textAlign: 'center', padding: '20px' }}>Belum ada foto. Upload dari form di atas.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginTop: '15px' }}>
+                {galeriList.map((item, idx) => (
+                  <div key={item.id} style={{ background: '#f9f9f9', borderRadius: '10px', overflow: 'hidden', border: '1px solid #eee', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <img src={item.url} alt={item.judul} style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ padding: '10px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '4px' }}>{idx + 1}. {item.judul}</div>
+                      {item.keterangan && <div style={{ fontSize: '0.75rem', color: '#888' }}>{item.keterangan}</div>}
+                      <button className="btn-delete-small" onClick={() => handleDeleteGaleri(item.id)} style={{ marginTop: '8px', width: '100%' }}>Hapus</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="page-card">
+            <h2>Galeri Foto</h2>
+            {galeriList.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#888', padding: '40px 0' }}>Belum ada foto yang ditampilkan.</p>
+            ) : (
+              <div className="galeri-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '20px' }}>
+                {galeriList.map(item => (
+                  <div key={item.id} className="galeri-card" style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid var(--border)' }}>
+                    <img
+                      src={item.url}
+                      alt={item.judul}
+                      style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                    />
+                    <div style={{ padding: '12px 14px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-h)' }}>📷 {item.judul}</div>
+                      {item.keterangan && <div style={{ fontSize: '0.82rem', color: 'var(--text)', marginTop: '4px' }}>{item.keterangan}</div>}
+                      {item.uploadedAt && (
+                        <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '6px' }}>
+                          {new Date(item.uploadedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const renderDataAnggota = () => {
     const pendingUmat = siteContent.umat.filter(u => u.isPending);
     const approvedUmat = siteContent.umat.filter(u => !u.isPending);
@@ -591,6 +826,7 @@ function App() {
       return <LoginForm onLoginSuccess={() => { setIsLoggedIn(true); setActiveTab('Beranda'); }} />
     }
     if (activeTab === 'Data Anggota') return renderDataAnggota()
+    if (activeTab === 'Galeri') return renderGaleri()
     if (activeTab === 'Pengurus') return renderPengurus()
 
     // Beranda & Jadwal Keluarga — konten halaman saja, tanpa PDF
@@ -635,6 +871,7 @@ function App() {
         <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
           <li className={activeTab === 'Beranda' ? 'active' : ''} onClick={() => setActiveTab('Beranda')}>Beranda</li>
           <li className={activeTab === 'Jadwal Keluarga' ? 'active' : ''} onClick={() => setActiveTab('Jadwal Keluarga')}>Jadwal Keluarga</li>
+          <li className={activeTab === 'Galeri' ? 'active' : ''} onClick={() => setActiveTab('Galeri')}>Galeri</li>
           <li className={activeTab === 'Data Anggota' ? 'active' : ''} onClick={() => setActiveTab('Data Anggota')}>Data Anggota</li>
           <li className={activeTab === 'Pengurus' ? 'active' : ''} onClick={() => setActiveTab('Pengurus')}>Pengurus</li>
           {isLoggedIn ? (
