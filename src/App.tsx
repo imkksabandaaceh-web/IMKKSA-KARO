@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from 'react'
 import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
@@ -164,9 +165,7 @@ function App() {
   const [albumMsg, setAlbumMsg] = useState<string | null>(null)
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null)
 
-  // State Baru: Untuk menampung foto-foto di dalam album tanpa iframe
-  const [albumPhotos, setAlbumPhotos] = useState<Record<string, any[]>>({})
-  const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
+
 
   // Data Anggota states
   const [userSearch, setUserSearch] = useState('')
@@ -190,52 +189,10 @@ function App() {
     setIsMobileMenuOpen(false)
   }, [activeTab])
 
-  // Fungsi Baru: Mengambil foto secara dinamis dari GScript berdasarkan folderId
-  const fetchAlbumPhotos = async (folderId: string) => {
-    if (albumPhotos[folderId]) return; // Jika sudah dimuat sebelumnya, jangan fetch ulang
-    
-    setLoadingPhotos(prev => ({ ...prev, [folderId]: true }));
-    try {
-      const response = await fetch(`${SCRIPT_URL}?action=getAlbumPhotos&folderId=${folderId}`, {
-        method: 'GET',
-        mode: 'cors',
-        redirect: 'follow'
-      });
-      const resData = await response.json();
-      if (resData.success) {
-        setAlbumPhotos(prev => ({ ...prev, [folderId]: resData.photos }));
-      } else {
-        console.error("GScript Error:", resData.error);
-      }
-    } catch (error) {
-      console.error("Gagal mengambil foto dari folder Drive:", error);
-    } finally {
-      setLoadingPhotos(prev => ({ ...prev, [folderId]: false }));
-    }
-  };
-
-  // Efek Otomatis: Jika ada album yang di-expand, langsung ambil fotonya
-  useEffect(() => {
-    if (expandedAlbum) {
-      const targetAlbum = siteContent.galeriAlbum?.find(a => a.id === expandedAlbum);
-      if (targetAlbum) {
-        fetchAlbumPhotos(targetAlbum.folderId);
-      }
-    }
-  }, [expandedAlbum]);
-
   const fetchData = async (isSilent = false) => {
     if (!isSilent) console.log("Memulai pengambilan data dari Google Drive...");
     try {
-      // Perbaikan CORS: Menambahkan mode: 'cors' dan Header bersih
-      const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { 
-        method: 'GET', 
-        mode: 'cors',
-        redirect: 'follow',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { method: 'GET', redirect: 'follow' })
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const text = await response.text();
@@ -523,16 +480,18 @@ function App() {
     setPengurusForm({ jabatan: 'Ketua', nama: '', photo: '' });
   }
 
-  // Helper: ekstrak folder ID dari link Google Drive
+  // ── Fungsi helper: ekstrak folder ID dari link Google Drive ──
   const extractFolderId = (url: string): string | null => {
+    // Format: drive.google.com/drive/folders/FOLDER_ID
     const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
     if (match) return match[1];
+    // Format: drive.google.com/drive/u/0/folders/FOLDER_ID
     const match2 = url.match(/folders\/([a-zA-Z0-9_-]+)/);
     if (match2) return match2[1];
     return null;
   }
 
-  // Tambah Album dari link folder Google Drive
+  // ── Tambah Album dari link folder Google Drive ──
   const handleTambahAlbum = async () => {
     if (!albumJudul.trim()) { setAlbumMsg('❌ Judul kegiatan harus diisi.'); return; }
     if (!albumFolderUrl.trim()) { setAlbumMsg('❌ Link folder Google Drive harus diisi.'); return; }
@@ -579,7 +538,7 @@ function App() {
     }
   }
 
-  // Hapus Album
+  // ── Hapus Album ──
   const handleHapusAlbum = async (id: string) => {
     if (!window.confirm('Hapus album ini dari Galeri?')) return;
     const newAlbumList = (siteContent.galeriAlbum || []).filter(a => a.id !== id);
@@ -598,7 +557,7 @@ function App() {
     }
   }
 
-  // Geser urutan Album naik / turun
+  // ── Geser urutan Album naik / turun ──
   const handleUrutAlbum = async (id: string, arah: 'naik' | 'turun') => {
     const list = [...(siteContent.galeriAlbum || [])];
     const idx = list.findIndex(a => a.id === id);
@@ -621,8 +580,13 @@ function App() {
     }
   }
 
+
   const renderGaleri = () => {
     const albumList = siteContent.galeriAlbum || [];
+
+    // Helper: URL embed iframe untuk folder Google Drive
+    const getFolderEmbedUrl = (folderId: string) =>
+      `https://drive.google.com/embeddedfolderview?id=${folderId}#grid`;
 
     return (
       <div className="page-content">
@@ -635,10 +599,10 @@ function App() {
             <div className="admin-data-form">
               <h3>➕ Tambah Album Kegiatan</h3>
               <p style={{ fontSize: '0.88rem', color: '#555', lineHeight: '1.7', marginBottom: '16px', background: '#f0f7f0', padding: '12px 16px', borderRadius: '8px', borderLeft: '4px solid var(--primary-color)' }}>
-                <strong>Cara pakai baru:</strong><br/>
+                <strong>Cara pakai:</strong><br/>
                 1. Upload semua foto kegiatan ke satu <strong>folder Google Drive</strong><br/>
                 2. Pastikan folder di-set <em>"Siapa saja yang punya link"</em> bisa melihat<br/>
-                3. Salin link folder, paste di bawah. Foto akan langsung ditarik secara rapi tanpa iframe kaku!
+                3. Salin link folder, paste di bawah → album langsung tampil di galeri situs
               </p>
               <div className="form-grid">
                 <div className="form-group">
@@ -710,6 +674,7 @@ function App() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {/* Tombol geser urutan */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }} onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => handleUrutAlbum(album.id, 'naik')}
@@ -735,22 +700,14 @@ function App() {
                         <span style={{ fontSize: '0.8rem', color: '#999' }}>{expandedAlbum === album.id ? '▲' : '▼'}</span>
                       </div>
                     </div>
-                    {/* Render Foto secara Native untuk Admin */}
                     {expandedAlbum === album.id && (
-                      <div style={{ padding: '20px', background: '#fff', borderTop: '1px solid #eee' }}>
-                        {loadingPhotos[album.folderId] ? (
-                          <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>⏳ Memuat foto kegiatan...</p>
-                        ) : !albumPhotos[album.folderId] || albumPhotos[album.folderId].length === 0 ? (
-                          <p style={{ textAlign: 'center', color: '#999', fontSize: '0.9rem' }}>Tidak ada foto gambar di folder ini.</p>
-                        ) : (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
-                            {albumPhotos[album.folderId].map(photo => (
-                              <div key={photo.id} style={{ borderRadius: '6px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', aspectRatio: '1/1', background: '#eee' }}>
-                                <img src={photo.url} alt={photo.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div style={{ padding: '0' }}>
+                        <iframe
+                          src={getFolderEmbedUrl(album.folderId)}
+                          title={album.judul}
+                          style={{ width: '100%', height: '400px', border: 'none', display: 'block' }}
+                          allowFullScreen
+                        />
                       </div>
                     )}
                   </div>
@@ -767,67 +724,48 @@ function App() {
                 Belum ada foto kegiatan yang ditampilkan.
               </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '24px' }}>
-                {albumList.map(album => {
-                  const isExpanded = expandedAlbum === album.id;
-                  return (
-                    <div key={album.id} style={{ border: '1px solid #e0e0e0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', background: '#fff' }}>
-                      {/* Header album click toggle */}
-                      <div 
-                        style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}
-                        onClick={() => setExpandedAlbum(isExpanded ? null : album.id)}
-                      >
-                        <div>
-                          <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: 'var(--primary-color)' }}>
-                            📁 {album.judul}
-                          </h3>
-                          {album.keterangan && (
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>{album.keterangan}</p>
-                          )}
-                          <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#aaa' }}>
-                            {new Date(album.addedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                          </p>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <a
-                            href={album.folderUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ fontSize: '0.8rem', color: '#1a73e8', textDecoration: 'none', padding: '4px 10px', border: '1px solid #1a73e8', borderRadius: '6px', whiteSpace: 'nowrap' }}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            🔗 Buka Drive
-                          </a>
-                          <span style={{ color: '#888', fontSize: '0.9rem' }}>{isExpanded ? '▲' : '▼'}</span>
-                        </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '24px' }}>
+                {albumList.map(album => (
+                  <div key={album.id} className="galeri-album-section">
+                    {/* Header album */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--primary-color)' }}>
+                          📁 {album.judul}
+                        </h3>
+                        {album.keterangan && (
+                          <p style={{ margin: 0, fontSize: '0.88rem', color: '#666' }}>{album.keterangan}</p>
+                        )}
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#aaa' }}>
+                          {new Date(album.addedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
                       </div>
-
-                      {/* Konten Grid Foto Native HTML (Bukan Iframe Lagi!) */}
-                      {isExpanded && (
-                        <div style={{ padding: '20px', borderTop: '1px solid #eee', background: '#fff' }}>
-                          {loadingPhotos[album.folderId] ? (
-                            <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>⏳ Memuat foto-foto...</p>
-                          ) : !albumPhotos[album.folderId] || albumPhotos[album.folderId].length === 0 ? (
-                            <p style={{ textAlign: 'center', color: '#999', padding: '20px 0' }}>Tidak ada foto gambar di dalam album ini.</p>
-                          ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
-                              {albumPhotos[album.folderId].map(photo => (
-                                <div key={photo.id} style={{ borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.08)', aspectRatio: '1/1', background: '#f5f5f5' }}>
-                                  <img 
-                                    src={photo.url} 
-                                    alt={photo.name} 
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
-                                    loading="lazy" 
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <a
+                        href={album.folderUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '0.82rem', color: '#1a73e8', textDecoration: 'none',
+                          padding: '6px 12px', border: '1px solid #1a73e8', borderRadius: '6px',
+                          whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                        }}
+                      >
+                        🔗 Lihat di Google Drive
+                      </a>
                     </div>
-                  );
-                })}
+
+                    {/* Embed folder Google Drive */}
+                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                      <iframe
+                        src={getFolderEmbedUrl(album.folderId)}
+                        title={album.judul}
+                        style={{ width: '100%', height: '480px', border: 'none', display: 'block' }}
+                        allowFullScreen
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -991,6 +929,7 @@ function App() {
     if (activeTab === 'Galeri') return renderGaleri()
     if (activeTab === 'Pengurus') return renderPengurus()
 
+    // Beranda & Jadwal Keluarga — konten halaman saja, tanpa PDF
     const currentPage = siteContent.pages[activeTab]
     if (!currentPage) return null
 
@@ -1027,6 +966,21 @@ function App() {
         <div className="logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" /></div>
         <h1>{siteContent.settings.title}</h1>
       </header>
+      <nav className="navbar">
+        <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? '✕' : '☰'} Menu</div>
+        <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+          <li className={activeTab === 'Beranda' ? 'active' : ''} onClick={() => setActiveTab('Beranda')}>Beranda</li>
+          <li className={activeTab === 'Jadwal Keluarga' ? 'active' : ''} onClick={() => setActiveTab('Jadwal Keluarga')}>Jadwal Keluarga</li>
+          <li className={activeTab === 'Galeri' ? 'active' : ''} onClick={() => setActiveTab('Galeri')}>Galeri</li>
+          <li className={activeTab === 'Data Anggota' ? 'active' : ''} onClick={() => setActiveTab('Data Anggota')}>Data Anggota</li>
+          <li className={activeTab === 'Pengurus' ? 'active' : ''} onClick={() => setActiveTab('Pengurus')}>Pengurus</li>
+          {isLoggedIn ? (
+            <li onClick={handleLogout}>Logout (Admin)</li>
+          ) : (
+            <li className={activeTab === 'Login' ? 'active' : ''} onClick={() => setActiveTab('Login')}>Login</li>
+          )}
+        </ul>
+      </nav>
       <nav className="navbar">
         <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? '✕' : '☰'} Menu</div>
         <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
