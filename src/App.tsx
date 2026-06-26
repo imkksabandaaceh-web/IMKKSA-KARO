@@ -40,6 +40,16 @@ interface GaleriItem {
   uploadedAt?: string;
 }
 
+// Album berbasis folder Google Drive
+interface GaleriAlbum {
+  id: string;
+  judul: string;       // nama kegiatan / judul album
+  keterangan?: string;
+  folderId: string;    // ID folder Google Drive
+  folderUrl: string;   // link lengkap yang dipaste admin
+  addedAt: string;
+}
+
 interface UmatRecord {
   id: string;
   nama: string;
@@ -65,6 +75,7 @@ interface FullContent {
   umat: UmatRecord[];
   pengurus: PengurusRecord[];
   galeri: GaleriItem[];
+  galeriAlbum: GaleriAlbum[];
 }
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxFxkRqujCCzNzMhOfmWEnQ8JJKqMD7xgJptDLDzA5DhPC9pqDouzU8sliU0jr7onUk3w/exec';
@@ -86,7 +97,8 @@ const DEFAULT_CONTENT: FullContent = {
   },
   umat: [],
   pengurus: [],
-  galeri: []
+  galeri: [],
+  galeriAlbum: []
 };
 
 function App() {
@@ -117,7 +129,8 @@ function App() {
           ...parsed,
           pages: { ...DEFAULT_CONTENT.pages, ...migratedPages },
           pengurus: loadedPengurus,
-          galeri: parsed.galeri || []
+          galeri: parsed.galeri || [],
+          galeriAlbum: parsed.galeriAlbum || []
         }
       } catch (e) {
         return DEFAULT_CONTENT
@@ -143,14 +156,15 @@ function App() {
     photo: ''
   })
 
-  // Galeri states
-  const [galeriJudul, setGaleriJudul] = useState('')
-  const [galeriKeterangan, setGaleriKeterangan] = useState('')
-  const [galeriFile, setGaleriFile] = useState<string | null>(null)
-  const [galeriFileName, setGaleriFileName] = useState('')
-  const [isUploadingFoto, setIsUploadingFoto] = useState(false)
-  const [galeriUploadMsg, setGaleriUploadMsg] = useState<string | null>(null)
-  const [galeriPreview, setGaleriPreview] = useState<string | null>(null)
+  // Galeri Album states (folder Google Drive)
+  const [albumJudul, setAlbumJudul] = useState('')
+  const [albumKeterangan, setAlbumKeterangan] = useState('')
+  const [albumFolderUrl, setAlbumFolderUrl] = useState('')
+  const [isAddingAlbum, setIsAddingAlbum] = useState(false)
+  const [albumMsg, setAlbumMsg] = useState<string | null>(null)
+  const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null)
+
+
 
   // Data Anggota states
   const [userSearch, setUserSearch] = useState('')
@@ -210,7 +224,8 @@ function App() {
             pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : prev.pages,
             umat: (data.umat && data.umat.length > 0) ? data.umat : prev.umat,
             pengurus: currentParsedPengurus,
-            galeri: data.galeri || prev.galeri || []
+            galeri: data.galeri || prev.galeri || [],
+            galeriAlbum: data.galeriAlbum || prev.galeriAlbum || []
           }
 
           const isSameUmat = JSON.stringify(prev.umat) === JSON.stringify(mergedContent.umat);
@@ -461,208 +476,249 @@ function App() {
     setPengurusForm({ jabatan: 'Ketua', nama: '', photo: '' });
   }
 
-  const handleUploadFoto = async () => {
-    if (!galeriJudul.trim()) { alert('Judul foto harus diisi.'); return; }
-    if (!galeriFile) { alert('Pilih foto terlebih dahulu.'); return; }
-
-    setIsUploadingFoto(true);
-    setGaleriUploadMsg('Mengunggah foto ke Google Drive...');
-
-    try {
-      // Simpan dulu ke localStorage sementara pakai URL preview lokal
-      const tempId = `temp_${Date.now()}`;
-      const newItem: GaleriItem = {
-        id: tempId,
-        judul: galeriJudul,
-        keterangan: galeriKeterangan,
-        url: galeriFile, // base64 sementara
-        driveId: tempId,
-        uploadedAt: new Date().toISOString()
-      };
-      const newGaleri = [...(siteContent.galeri || []), newItem];
-      const newContent = { ...siteContent, galeri: newGaleri };
-      setSiteContent(newContent);
-      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
-
-      // Kirim ke Google Drive via Apps Script
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          action     : 'uploadFoto',
-          base64     : galeriFile,
-          namaFile   : galeriFileName || `foto_${Date.now()}.jpg`,
-          judul      : galeriJudul,
-          keterangan : galeriKeterangan,
-          tempId     : tempId
-        }),
-      });
-
-      setGaleriUploadMsg('✅ Foto berhasil diunggah! Menunggu sinkronisasi...');
-      setGaleriJudul('');
-      setGaleriKeterangan('');
-      setGaleriFile(null);
-      setGaleriFileName('');
-      setGaleriPreview(null);
-
-      // Tunggu 5 detik lalu refresh dari server untuk dapat URL Drive yang benar
-      setTimeout(async () => {
-        await fetchData(true);
-        setGaleriUploadMsg('✅ Galeri berhasil diperbarui!');
-        setTimeout(() => setGaleriUploadMsg(null), 3000);
-      }, 5000);
-
-    } catch (err) {
-      setGaleriUploadMsg('❌ Gagal menghubungi server. Coba lagi.');
-      console.error(err);
-      setIsUploadingFoto(false);
-    } finally {
-      setIsUploadingFoto(false);
-    }
+  // ── Fungsi helper: ekstrak folder ID dari link Google Drive ──
+  const extractFolderId = (url: string): string | null => {
+    // Format: drive.google.com/drive/folders/FOLDER_ID
+    const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+    // Format: drive.google.com/drive/u/0/folders/FOLDER_ID
+    const match2 = url.match(/folders\/([a-zA-Z0-9_-]+)/);
+    if (match2) return match2[1];
+    return null;
   }
 
-  const handleDeleteGaleri = async (id: string) => {
-    if (!window.confirm('Hapus foto ini dari Galeri dan Google Drive?')) return;
+  // ── Tambah Album dari link folder Google Drive ──
+  const handleTambahAlbum = async () => {
+    if (!albumJudul.trim()) { setAlbumMsg('❌ Judul kegiatan harus diisi.'); return; }
+    if (!albumFolderUrl.trim()) { setAlbumMsg('❌ Link folder Google Drive harus diisi.'); return; }
 
-    // Hapus dari state dan localStorage dulu (langsung terasa)
-    const newGaleri = (siteContent.galeri || []).filter(g => g.id !== id);
-    const newContent = { ...siteContent, galeri: newGaleri };
+    const folderId = extractFolderId(albumFolderUrl);
+    if (!folderId) {
+      setAlbumMsg('❌ Link tidak valid. Pastikan link folder Google Drive berbentuk: https://drive.google.com/drive/folders/...');
+      return;
+    }
+
+    setIsAddingAlbum(true);
+    setAlbumMsg('⏳ Menyimpan album...');
+
+    const newAlbum: GaleriAlbum = {
+      id: Date.now().toString(),
+      judul: albumJudul.trim(),
+      keterangan: albumKeterangan.trim() || undefined,
+      folderId,
+      folderUrl: albumFolderUrl.trim(),
+      addedAt: new Date().toISOString()
+    };
+
+    const newAlbumList = [...(siteContent.galeriAlbum || []), newAlbum];
+    const newContent = { ...siteContent, galeriAlbum: newAlbumList };
     setSiteContent(newContent);
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
-    // Kirim perintah hapus ke Drive
     try {
       await fetch(SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'hapusFoto', id }),
+        body: JSON.stringify({ action: 'updateGaleriAlbum', data: newAlbumList }),
       });
-      alert('Foto berhasil dihapus.');
-    } catch (error) {
-      console.error("Gagal hapus di Drive:", error);
-      alert('Foto dihapus dari tampilan. Sinkronisasi Drive mungkin tertunda.');
+      setAlbumMsg('✅ Album berhasil ditambahkan! Foto dari folder akan tampil di galeri.');
+    } catch {
+      setAlbumMsg('✅ Album disimpan. Sinkronisasi Drive mungkin tertunda.');
+    } finally {
+      setIsAddingAlbum(false);
+      setAlbumJudul('');
+      setAlbumKeterangan('');
+      setAlbumFolderUrl('');
+      setTimeout(() => setAlbumMsg(null), 5000);
     }
   }
 
-  const handlePilihFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Ukuran foto maksimal 5 MB.'); return; }
-    setGaleriFileName(file.name);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      const compressed = await compressImage(base64, 1200, 0.8);
-      setGaleriFile(compressed);
-      setGaleriPreview(compressed);
-    };
-    reader.readAsDataURL(file);
+  // ── Hapus Album ──
+  const handleHapusAlbum = async (id: string) => {
+    if (!window.confirm('Hapus album ini dari Galeri?')) return;
+    const newAlbumList = (siteContent.galeriAlbum || []).filter(a => a.id !== id);
+    const newContent = { ...siteContent, galeriAlbum: newAlbumList };
+    setSiteContent(newContent);
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'updateGaleriAlbum', data: newAlbumList }),
+      });
+    } catch (e) {
+      console.error('Gagal sinkron hapus album:', e);
+    }
   }
 
+
   const renderGaleri = () => {
-    const galeriList = siteContent.galeri || [];
+    const albumList = siteContent.galeriAlbum || [];
+
+    // Helper: URL embed iframe untuk folder Google Drive
+    const getFolderEmbedUrl = (folderId: string) =>
+      `https://drive.google.com/embeddedfolderview?id=${folderId}#grid`;
+
     return (
       <div className="page-content">
         {isLoggedIn ? (
+          /* ── ADMIN VIEW ── */
           <div className="admin-data-section">
-            <h2>Kelola Galeri Foto</h2>
+            <h2>Kelola Galeri Kegiatan</h2>
+
+            {/* Form tambah album */}
             <div className="admin-data-form">
-              <h3>Upload Foto Baru</h3>
-              <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '15px', lineHeight: '1.6' }}>
-                📁 Foto akan tersimpan otomatis di <strong>Google Drive → Folder "Galeri IMKKSA"</strong> dan langsung tampil di situs.
+              <h3>➕ Tambah Album Kegiatan</h3>
+              <p style={{ fontSize: '0.88rem', color: '#555', lineHeight: '1.7', marginBottom: '16px', background: '#f0f7f0', padding: '12px 16px', borderRadius: '8px', borderLeft: '4px solid var(--primary-color)' }}>
+                <strong>Cara pakai:</strong><br/>
+                1. Upload semua foto kegiatan ke satu <strong>folder Google Drive</strong><br/>
+                2. Pastikan folder di-set <em>"Siapa saja yang punya link"</em> bisa melihat<br/>
+                3. Salin link folder, paste di bawah → album langsung tampil di galeri situs
               </p>
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Judul Foto <span style={{ color: 'red' }}>*</span>:</label>
+                  <label>Nama Kegiatan / Judul Album <span style={{ color: 'red' }}>*</span>:</label>
                   <input
                     type="text"
                     placeholder="Contoh: Pertemuan Keluarga Juli 2026"
-                    value={galeriJudul}
-                    onChange={e => setGaleriJudul(e.target.value)}
-                    disabled={isUploadingFoto}
+                    value={albumJudul}
+                    onChange={e => setAlbumJudul(e.target.value)}
+                    disabled={isAddingAlbum}
                   />
                 </div>
                 <div className="form-group">
                   <label>Keterangan (opsional):</label>
                   <input
                     type="text"
-                    placeholder="Deskripsi singkat foto..."
-                    value={galeriKeterangan}
-                    onChange={e => setGaleriKeterangan(e.target.value)}
-                    disabled={isUploadingFoto}
+                    placeholder="Contoh: Dilaksanakan di Gereja IMKKSA, 12 Juli 2026"
+                    value={albumKeterangan}
+                    onChange={e => setAlbumKeterangan(e.target.value)}
+                    disabled={isAddingAlbum}
                   />
                 </div>
                 <div className="form-group full-width">
-                  <label>Pilih Foto (maks. 5 MB):</label>
+                  <label>Link Folder Google Drive <span style={{ color: 'red' }}>*</span>:</label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePilihFoto}
-                    disabled={isUploadingFoto}
+                    type="url"
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    value={albumFolderUrl}
+                    onChange={e => setAlbumFolderUrl(e.target.value)}
+                    disabled={isAddingAlbum}
+                    style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}
                   />
                 </div>
-                {galeriPreview && (
-                  <div className="form-group full-width">
-                    <label>Pratinjau:</label>
-                    <img src={galeriPreview} alt="preview" style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #ddd' }} />
-                  </div>
-                )}
               </div>
-              {galeriUploadMsg && (
-                <div style={{ margin: '10px 0', padding: '10px 15px', background: galeriUploadMsg.startsWith('✅') ? '#e8f5e9' : '#fff3e0', borderRadius: '8px', fontSize: '0.9rem', color: galeriUploadMsg.startsWith('✅') ? '#2e7d32' : '#e65100' }}>
-                  {galeriUploadMsg}
+              {albumMsg && (
+                <div style={{
+                  margin: '10px 0', padding: '10px 15px',
+                  background: albumMsg.startsWith('✅') ? '#e8f5e9' : albumMsg.startsWith('⏳') ? '#fff8e1' : '#ffebee',
+                  borderRadius: '8px', fontSize: '0.9rem',
+                  color: albumMsg.startsWith('✅') ? '#2e7d32' : albumMsg.startsWith('⏳') ? '#e65100' : '#c62828'
+                }}>
+                  {albumMsg}
                 </div>
               )}
               <div className="admin-action-buttons">
-                <button className="btn-save" onClick={handleUploadFoto} disabled={isUploadingFoto}>
-                  {isUploadingFoto ? '⏳ Mengunggah...' : '📤 Upload ke Google Drive'}
+                <button className="btn-save" onClick={handleTambahAlbum} disabled={isAddingAlbum}>
+                  {isAddingAlbum ? '⏳ Menyimpan...' : '📁 Simpan Album'}
                 </button>
               </div>
             </div>
 
-            <h3 style={{ marginTop: '30px' }}>Daftar Foto Galeri ({galeriList.length})</h3>
-            {galeriList.length === 0 ? (
-              <p style={{ color: '#888', textAlign: 'center', padding: '20px' }}>Belum ada foto. Upload dari form di atas.</p>
+            {/* Daftar album */}
+            <h3 style={{ marginTop: '30px' }}>Daftar Album ({albumList.length})</h3>
+            {albumList.length === 0 ? (
+              <p style={{ color: '#888', textAlign: 'center', padding: '20px' }}>
+                Belum ada album. Tambah album di atas dengan link folder Google Drive.
+              </p>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginTop: '15px' }}>
-                {galeriList.map((item, idx) => (
-                  <div key={item.id} style={{ background: '#f9f9f9', borderRadius: '10px', overflow: 'hidden', border: '1px solid #eee', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                    <img src={item.url} alt={item.judul} style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '4px' }}>{idx + 1}. {item.judul}</div>
-                      {item.keterangan && <div style={{ fontSize: '0.75rem', color: '#888' }}>{item.keterangan}</div>}
-                      <button className="btn-delete-small" onClick={() => handleDeleteGaleri(item.id)} style={{ marginTop: '8px', width: '100%' }}>Hapus</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
+                {albumList.map((album) => (
+                  <div key={album.id} style={{ background: '#f9f9f9', borderRadius: '10px', border: '1px solid #eee', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer', background: '#fff' }}
+                      onClick={() => setExpandedAlbum(expandedAlbum === album.id ? null : album.id)}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>📁 {album.judul}</div>
+                        {album.keterangan && <div style={{ fontSize: '0.8rem', color: '#777', marginTop: '2px' }}>{album.keterangan}</div>}
+                        <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '4px' }}>
+                          Ditambahkan: {new Date(album.addedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <a href={album.folderUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: '0.78rem', color: '#1a73e8', textDecoration: 'none', padding: '4px 8px', border: '1px solid #1a73e8', borderRadius: '4px' }}
+                          onClick={e => e.stopPropagation()}>
+                          Buka Drive
+                        </a>
+                        <button className="btn-delete-small" onClick={e => { e.stopPropagation(); handleHapusAlbum(album.id); }}>Hapus</button>
+                        <span style={{ fontSize: '0.8rem', color: '#999' }}>{expandedAlbum === album.id ? '▲' : '▼'}</span>
+                      </div>
                     </div>
+                    {expandedAlbum === album.id && (
+                      <div style={{ padding: '0' }}>
+                        <iframe
+                          src={getFolderEmbedUrl(album.folderId)}
+                          title={album.judul}
+                          style={{ width: '100%', height: '400px', border: 'none', display: 'block' }}
+                          allowFullScreen
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
         ) : (
+          /* ── PUBLIC VIEW ── */
           <div className="page-card">
-            <h2>Galeri Foto</h2>
-            {galeriList.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#888', padding: '40px 0' }}>Belum ada foto yang ditampilkan.</p>
+            <h2>Galeri Kegiatan</h2>
+            {albumList.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#888', padding: '40px 0' }}>
+                Belum ada foto kegiatan yang ditampilkan.
+              </p>
             ) : (
-              <div className="galeri-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '20px' }}>
-                {galeriList.map(item => (
-                  <div key={item.id} className="galeri-card" style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid var(--border)' }}>
-                    <img
-                      src={item.url}
-                      alt={item.judul}
-                      style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
-                      loading="lazy"
-                    />
-                    <div style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-h)' }}>📷 {item.judul}</div>
-                      {item.keterangan && <div style={{ fontSize: '0.82rem', color: 'var(--text)', marginTop: '4px' }}>{item.keterangan}</div>}
-                      {item.uploadedAt && (
-                        <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '6px' }}>
-                          {new Date(item.uploadedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                        </div>
-                      )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '24px' }}>
+                {albumList.map(album => (
+                  <div key={album.id} className="galeri-album-section">
+                    {/* Header album */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--primary-color)' }}>
+                          📁 {album.judul}
+                        </h3>
+                        {album.keterangan && (
+                          <p style={{ margin: 0, fontSize: '0.88rem', color: '#666' }}>{album.keterangan}</p>
+                        )}
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#aaa' }}>
+                          {new Date(album.addedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <a
+                        href={album.folderUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '0.82rem', color: '#1a73e8', textDecoration: 'none',
+                          padding: '6px 12px', border: '1px solid #1a73e8', borderRadius: '6px',
+                          whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                        }}
+                      >
+                        🔗 Lihat di Google Drive
+                      </a>
+                    </div>
+
+                    {/* Embed folder Google Drive */}
+                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                      <iframe
+                        src={getFolderEmbedUrl(album.folderId)}
+                        title={album.judul}
+                        style={{ width: '100%', height: '480px', border: 'none', display: 'block' }}
+                        allowFullScreen
+                        loading="lazy"
+                      />
                     </div>
                   </div>
                 ))}
