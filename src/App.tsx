@@ -553,6 +553,29 @@ function App() {
     }
   }
 
+  // ── Geser urutan Album naik / turun ──
+  const handleUrutAlbum = async (id: string, arah: 'naik' | 'turun') => {
+    const list = [...(siteContent.galeriAlbum || [])];
+    const idx = list.findIndex(a => a.id === id);
+    if (arah === 'naik' && idx === 0) return;
+    if (arah === 'turun' && idx === list.length - 1) return;
+    const tukar = arah === 'naik' ? idx - 1 : idx + 1;
+    [list[idx], list[tukar]] = [list[tukar], list[idx]];
+    const newContent = { ...siteContent, galeriAlbum: list };
+    setSiteContent(newContent);
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'updateGaleriAlbum', data: list }),
+      });
+    } catch (e) {
+      console.error('Gagal sinkron urutan album:', e);
+    }
+  }
+
 
   const renderGaleri = () => {
     const albumList = siteContent.galeriAlbum || [];
@@ -635,7 +658,7 @@ function App() {
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-                {albumList.map((album) => (
+                {albumList.map((album, idx) => (
                   <div key={album.id} style={{ background: '#f9f9f9', borderRadius: '10px', border: '1px solid #eee', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer', background: '#fff' }}
                       onClick={() => setExpandedAlbum(expandedAlbum === album.id ? null : album.id)}>
@@ -646,7 +669,24 @@ function App() {
                           Ditambahkan: {new Date(album.addedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {/* Tombol geser urutan */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }} onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleUrutAlbum(album.id, 'naik')}
+                            disabled={idx === 0}
+                            title="Geser ke atas"
+                            style={{ padding: '2px 8px', fontSize: '0.75rem', background: idx === 0 ? '#f0f0f0' : '#e8f5e9', border: '1px solid #ccc', borderRadius: '4px', cursor: idx === 0 ? 'not-allowed' : 'pointer', color: idx === 0 ? '#bbb' : '#2e7d32', fontWeight: 700 }}>
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => handleUrutAlbum(album.id, 'turun')}
+                            disabled={idx === albumList.length - 1}
+                            title="Geser ke bawah"
+                            style={{ padding: '2px 8px', fontSize: '0.75rem', background: idx === albumList.length - 1 ? '#f0f0f0' : '#e8f5e9', border: '1px solid #ccc', borderRadius: '4px', cursor: idx === albumList.length - 1 ? 'not-allowed' : 'pointer', color: idx === albumList.length - 1 ? '#bbb' : '#2e7d32', fontWeight: 700 }}>
+                            ▼
+                          </button>
+                        </div>
                         <a href={album.folderUrl} target="_blank" rel="noopener noreferrer"
                           style={{ fontSize: '0.78rem', color: '#1a73e8', textDecoration: 'none', padding: '4px 8px', border: '1px solid #1a73e8', borderRadius: '4px' }}
                           onClick={e => e.stopPropagation()}>
