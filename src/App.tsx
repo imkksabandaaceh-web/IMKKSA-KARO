@@ -981,21 +981,6 @@ function App() {
           )}
         </ul>
       </nav>
-      <nav className="navbar">
-        <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? '✕' : '☰'} Menu</div>
-        <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-          <li className={activeTab === 'Beranda' ? 'active' : ''} onClick={() => setActiveTab('Beranda')}>Beranda</li>
-          <li className={activeTab === 'Jadwal Keluarga' ? 'active' : ''} onClick={() => setActiveTab('Jadwal Keluarga')}>Jadwal Keluarga</li>
-          <li className={activeTab === 'Galeri' ? 'active' : ''} onClick={() => setActiveTab('Galeri')}>Galeri</li>
-          <li className={activeTab === 'Data Anggota' ? 'active' : ''} onClick={() => setActiveTab('Data Anggota')}>Data Anggota</li>
-          <li className={activeTab === 'Pengurus' ? 'active' : ''} onClick={() => setActiveTab('Pengurus')}>Pengurus</li>
-          {isLoggedIn ? (
-            <li onClick={handleLogout}>Logout (Admin)</li>
-          ) : (
-            <li className={activeTab === 'Login' ? 'active' : ''} onClick={() => setActiveTab('Login')}>Login</li>
-          )}
-        </ul>
-      </nav>
       <main className="main-content">{renderPage()}</main>
       <footer className="footer">&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</footer>
     </div>
