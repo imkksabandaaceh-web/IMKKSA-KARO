@@ -164,6 +164,7 @@ function App() {
   const [albumFolderUrl, setAlbumFolderUrl] = useState('')
   const [isAddingAlbum, setIsAddingAlbum] = useState(false)
   const [albumMsg, setAlbumMsg] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null)
 
 
@@ -195,6 +196,7 @@ function App() {
     try {
       const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { method: 'GET', mode: 'cors', redirect: 'follow' })
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      setFetchError(null);
 
       const text = await response.text();
       if (!text || text.trim() === '') throw new Error('Response kosong dari server');
@@ -246,7 +248,10 @@ function App() {
         });
       }
     } catch (error) {
-      if (!isSilent) console.error("Gagal mengambil data dari Google Drive:", error)
+      if (!isSilent) {
+        console.error("Gagal mengambil data dari Google Drive:", error);
+        setFetchError(error instanceof Error ? error.message : String(error));
+      }
     } finally {
       if (!isSilent) setIsLoading(false)
     }
@@ -729,9 +734,21 @@ function App() {
           <div className="page-card">
             <h2>Galeri Kegiatan</h2>
             {albumList.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#888', padding: '40px 0' }}>
-                Belum ada foto kegiatan yang ditampilkan.
-              </p>
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                {fetchError ? (
+                  <div style={{ color: '#c62828', background: '#ffebee', padding: '20px', borderRadius: '10px', maxWidth: '500px', margin: '0 auto', border: '1px solid #ffcdd2', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', fontSize: '0.95rem' }}>⚠️ Gagal terhubung ke Google Apps Script (Database)</p>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', fontFamily: 'monospace', background: '#f5f5f5', padding: '6px', borderRadius: '4px', border: '1px solid #e0e0e0', color: '#333' }}>{fetchError}</p>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#555', lineHeight: 1.4 }}>
+                      Hal ini biasanya terjadi karena browser Firefox memblokir request pengalihan Google Drive. Coba matikan <strong>Firefox Enhanced Tracking Protection (adblocker)</strong> untuk situs ini, atau buka di Chrome/Edge.
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ color: '#888', margin: 0 }}>
+                    Belum ada foto kegiatan yang ditampilkan.
+                  </p>
+                )}
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '24px' }}>
                 {albumList.map(album => (
