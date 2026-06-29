@@ -27,15 +27,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 const IMAGEKIT_ENDPOINT = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
 
 // Konversi URL lh3.googleusercontent.com → ImageKit proxy
-// Jika ImageKit belum dikonfigurasi, kembalikan URL asli (hanya Chrome yang bisa)
+// Jika ImageKit belum dikonfigurasi, gunakan Google Drive thumbnail yang kompatibel dengan semua browser (Chrome, Firefox, Edge, Safari)
 const toImageKitUrl = (fileId: string, width = 800): string => {
-  const googleThumbUrl = `/d/${fileId}`;
   if (IMAGEKIT_ENDPOINT) {
+    const googleThumbUrl = `/d/${fileId}`;
     // Format: https://ik.imagekit.io/USERNAME/d/FILE_ID?tr=w-800,q-80
     return `${IMAGEKIT_ENDPOINT}${googleThumbUrl}?tr=w-${width},q-80`;
   }
-  // Fallback: langsung ke googleusercontent (hanya Chrome)
-  return `https://lh3.googleusercontent.com${googleThumbUrl}`;
+  // Fallback lintas-browser menggunakan direct thumbnail Google Drive
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

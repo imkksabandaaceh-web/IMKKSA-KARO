@@ -483,11 +483,16 @@ function App() {
 
   // ── Fungsi helper: ekstrak folder ID dari link Google Drive ──
   const extractFolderId = (url: string): string | null => {
+    const trimmed = url.trim();
+    // Jika input langsung berupa Folder ID
+    if (/^[a-zA-Z0-9_-]{25,50}$/.test(trimmed)) {
+      return trimmed;
+    }
     // Format: drive.google.com/drive/folders/FOLDER_ID
-    const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
     if (match) return match[1];
     // Format: drive.google.com/drive/u/0/folders/FOLDER_ID
-    const match2 = url.match(/folders\/([a-zA-Z0-9_-]+)/);
+    const match2 = trimmed.match(/folders\/([a-zA-Z0-9_-]+)/);
     if (match2) return match2[1];
     return null;
   }
