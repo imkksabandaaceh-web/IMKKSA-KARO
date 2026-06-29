@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
 import './App.css'
+import AlbumGallery from './components/GaleriView'
 
 const compressImage = async (
   base64: string,
@@ -700,16 +701,19 @@ function App() {
                         <span style={{ fontSize: '0.8rem', color: '#999' }}>{expandedAlbum === album.id ? '▲' : '▼'}</span>
                       </div>
                     </div>
-                    {expandedAlbum === album.id && (
-                      <div style={{ padding: '0' }}>
-                        <iframe
-                          src={getFolderEmbedUrl(album.folderId)}
-                          title={album.judul}
-                          style={{ width: '100%', height: '400px', border: 'none', display: 'block' }}
-                          allowFullScreen
-                        />
-                      </div>
-                    )}
+                     {expandedAlbum === album.id && (
+                       <div style={{ padding: '12px' }}>
+                       <AlbumGallery
+                         folderId={album.folderId}
+                         folderUrl={album.folderUrl}
+                         scriptUrl={SCRIPT_URL}
+                       />
+                     </div>
+                   )}
+
+
+
+
                   </div>
                 ))}
               </div>
@@ -753,15 +757,13 @@ function App() {
                         🔗 Lihat di Google Drive
                       </a>
                     </div>
-
-                    {/* Embed folder Google Drive */}
-                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                      <iframe
-                        src={getFolderEmbedUrl(album.folderId)}
-                        title={album.judul}
-                        style={{ width: '100%', height: '480px', border: 'none', display: 'block' }}
-                        allowFullScreen
-                        loading="lazy"
+                    
+                    {/* Grid foto lintas-browser via AlbumGallery */}
+                    <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e0e0e0', padding: '12px', background: '#fff' }}>
+                     <AlbumGallery
+                       folderId={album.folderId}
+                       folderUrl={album.folderUrl}
+                       scriptUrl={SCRIPT_URL}
                       />
                     </div>
                   </div>
