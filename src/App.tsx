@@ -239,8 +239,10 @@ function App() {
           const isSamePages = JSON.stringify(prev.pages) === JSON.stringify(mergedContent.pages);
           const isSameSettings = JSON.stringify(prev.settings) === JSON.stringify(mergedContent.settings);
           const isSamePengurus = JSON.stringify(prev.pengurus) === JSON.stringify(mergedContent.pengurus);
+          const isSameGaleriAlbum = JSON.stringify(prev.galeriAlbum) === JSON.stringify(mergedContent.galeriAlbum);
+          const isSameGaleri = JSON.stringify(prev.galeri) === JSON.stringify(mergedContent.galeri);
 
-          if (!isSameUmat || !isSamePages || !isSameSettings || !isSamePengurus) {
+          if (!isSameUmat || !isSamePages || !isSameSettings || !isSamePengurus || !isSameGaleriAlbum || !isSameGaleri) {
             localStorage.setItem('imkksaSiteContent', JSON.stringify(mergedContent));
             return mergedContent;
           }
