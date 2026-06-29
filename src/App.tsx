@@ -193,7 +193,7 @@ function App() {
   const fetchData = async (isSilent = false) => {
     if (!isSilent) console.log("Memulai pengambilan data dari Google Drive...");
     try {
-      const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { method: 'GET', redirect: 'follow' })
+      const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { method: 'GET', mode: 'cors', redirect: 'follow' })
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const text = await response.text();

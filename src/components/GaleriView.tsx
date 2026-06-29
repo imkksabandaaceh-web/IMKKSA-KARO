@@ -73,7 +73,7 @@ const fetchFolderFiles = async (
 ): Promise<DriveFile[]> => {
   // Panggil Google Apps Script yang sudah ada, tambahkan action=listFolder
   const url = `${scriptUrl}?action=listFolder&folderId=${encodeURIComponent(folderId)}&t=${Date.now()}`;
-  const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+  const response = await fetch(url, { method: 'GET', mode: 'cors', redirect: 'follow' });
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
