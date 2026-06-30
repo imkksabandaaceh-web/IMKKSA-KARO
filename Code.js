@@ -100,13 +100,58 @@ function doPost(e) {
   }
 }
 
-function getSiteData() {
+// Helper to save large properties by splitting them into chunks if they exceed 9KB
+function setLargeProperty(key, valueStr) {
   var properties = PropertiesService.getScriptProperties();
-  var settings = JSON.parse(properties.getProperty("settings") || '{"logo": "/LOGO_KARO.jpg", "title": "IMKKSA Banda Aceh Sekitar"}');
-  var pages = JSON.parse(properties.getProperty("pages") || '{}');
-  var umat = JSON.parse(properties.getProperty("umat") || '[]');
-  var pengurus = JSON.parse(properties.getProperty("pengurus") || '[]');
-  var galeriAlbum = JSON.parse(properties.getProperty("galeriAlbum") || '[]');
+  
+  // Delete any existing chunked properties for this key to prevent orphan chunks
+  var allProperties = properties.getProperties();
+  for (var propKey in allProperties) {
+    if (propKey === key || propKey.indexOf(key + "_chunk_") === 0 || propKey === key + "_chunks") {
+      properties.deleteProperty(propKey);
+    }
+  }
+  
+  var chunkSize = 8000; // safe limit below 9KB (9000 bytes)
+  if (valueStr.length <= chunkSize) {
+    properties.setProperty(key, valueStr);
+  } else {
+    var chunkCount = Math.ceil(valueStr.length / chunkSize);
+    properties.setProperty(key + "_chunks", chunkCount.toString());
+    for (var i = 0; i < chunkCount; i++) {
+      var chunk = valueStr.substring(i * chunkSize, (i + 1) * chunkSize);
+      properties.setProperty(key + "_chunk_" + i, chunk);
+    }
+  }
+}
+
+// Helper to load large properties that may have been split into chunks
+function getLargeProperty(key, defaultValue) {
+  var properties = PropertiesService.getScriptProperties();
+  var chunkCountStr = properties.getProperty(key + "_chunks");
+  
+  if (chunkCountStr) {
+    var chunkCount = parseInt(chunkCountStr, 10);
+    var valueStr = "";
+    for (var i = 0; i < chunkCount; i++) {
+      var chunk = properties.getProperty(key + "_chunk_" + i);
+      if (chunk) {
+        valueStr += chunk;
+      }
+    }
+    return valueStr;
+  }
+  
+  var normalValue = properties.getProperty(key);
+  return normalValue !== null ? normalValue : defaultValue;
+}
+
+function getSiteData() {
+  var settings = JSON.parse(getLargeProperty("settings", '{"logo": "/LOGO_KARO.jpg", "title": "IMKKSA Banda Aceh Sekitar"}'));
+  var pages = JSON.parse(getLargeProperty("pages", '{}'));
+  var umat = JSON.parse(getLargeProperty("umat", '[]'));
+  var pengurus = JSON.parse(getLargeProperty("pengurus", '[]'));
+  var galeriAlbum = JSON.parse(getLargeProperty("galeriAlbum", '[]'));
   
   return {
     settings: settings,
@@ -118,9 +163,8 @@ function getSiteData() {
 }
 
 function saveSiteData(data) {
-  var properties = PropertiesService.getScriptProperties();
-  if (data.settings) properties.setProperty("settings", JSON.stringify(data.settings));
-  if (data.pages) properties.setProperty("pages", JSON.stringify(data.pages));
+  if (data.settings) setLargeProperty("settings", JSON.stringify(data.settings));
+  if (data.pages) setLargeProperty("pages", JSON.stringify(data.pages));
 }
 
 function getOrCreateFolder(folderName) {
@@ -190,13 +234,11 @@ function saveUmatData(umatList) {
     }
   }
   
-  var properties = PropertiesService.getScriptProperties();
-  properties.setProperty("umat", JSON.stringify(umatList));
+  setLargeProperty("umat", JSON.stringify(umatList));
 }
 
 function saveGaleriAlbumData(albumList) {
-  var properties = PropertiesService.getScriptProperties();
-  properties.setProperty("galeriAlbum", JSON.stringify(albumList));
+  setLargeProperty("galeriAlbum", JSON.stringify(albumList));
 }
 
 function listFolderFiles(folderId) {
