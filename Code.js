@@ -123,7 +123,73 @@ function saveSiteData(data) {
   if (data.pages) properties.setProperty("pages", JSON.stringify(data.pages));
 }
 
+function getOrCreateFolder(folderName) {
+  var folders = DriveApp.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  } else {
+    var folder = DriveApp.createFolder(folderName);
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return folder;
+  }
+}
+
+function uploadBase64ToFolder(base64Data, fileName, folder) {
+  try {
+    var parts = base64Data.split(",");
+    var meta = parts[0];
+    var rawBase64 = parts[1];
+    
+    var mimeType = "image/jpeg";
+    var mimeMatch = meta.match(/data:(.*?);/);
+    if (mimeMatch && mimeMatch[1]) {
+      mimeType = mimeMatch[1];
+    }
+    
+    var extension = "jpg";
+    if (mimeType === "image/png") extension = "png";
+    else if (mimeType === "image/gif") extension = "gif";
+    else if (mimeType === "image/webp") extension = "webp";
+    
+    var fullFileName = fileName + "." + extension;
+    var decoded = Utilities.base64Decode(rawBase64);
+    var blob = Utilities.newBlob(decoded, mimeType, fullFileName);
+    
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    var url = "https://lh3.googleusercontent.com/d/" + file.getId();
+    return { success: true, url: url };
+  } catch (e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
 function saveUmatData(umatList) {
+  var folder = getOrCreateFolder("IMKKSA_Anggota_Dokumen");
+  
+  for (var i = 0; i < umatList.length; i++) {
+    var umat = umatList[i];
+    
+    // Upload photo if it's base64 data
+    if (umat.photo && umat.photo.indexOf("data:") === 0) {
+      var fileName = "PHOTO_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
+      var uploadResult = uploadBase64ToFolder(umat.photo, fileName, folder);
+      if (uploadResult.success) {
+        umat.photo = uploadResult.url;
+      }
+    }
+    
+    // Upload KK if it's base64 data
+    if (umat.kk && umat.kk.indexOf("data:") === 0) {
+      var fileName = "KK_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
+      var uploadResult = uploadBase64ToFolder(umat.kk, fileName, folder);
+      if (uploadResult.success) {
+        umat.kk = uploadResult.url;
+      }
+    }
+  }
+  
   var properties = PropertiesService.getScriptProperties();
   properties.setProperty("umat", JSON.stringify(umatList));
 }

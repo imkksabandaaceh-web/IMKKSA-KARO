@@ -5,13 +5,41 @@ import AdminDashboard from './components/AdminDashboard'
 import './App.css'
 import AlbumGallery from './components/GaleriView'
 
-const compressImage = async (
-  base64: string,
-  _width: number,
-  _quality: number
-) => {
-  return base64
-}
+const compressImage = (base64: string, maxWidth: number, quality: number): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        try {
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedBase64);
+        } catch (e) {
+          resolve(base64);
+        }
+      } else {
+        resolve(base64);
+      }
+    };
+    img.onerror = () => {
+      resolve(base64);
+    };
+  });
+};
 
 // Types
 type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login';
@@ -171,20 +199,21 @@ function App() {
 
   // Data Anggota states
   const [userSearch, setUserSearch] = useState('')
+  const [userSearchQuery, setUserSearchQuery] = useState('')
   const [adminSearch, setAdminSearch] = useState('')
   const [umatForm, setUmatForm] = useState<Omit<UmatRecord, 'id' | 'isPending'>>({
-    nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: ''
+    nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: ''
   })
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   // Non-Admin data anggota flow
-  const [userSearchResults, setUserSearchResults] = useState<UmatRecord[]>([])
-  const [hasUserSearched, setHasUserSearched] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
   const [userUmatForm, setUserUmatForm] = useState<Omit<UmatRecord, 'id' | 'isPending'>>({
-    nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: ''
+    nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: ''
   })
   const [userSubmitMessage, setUserSubmitMessage] = useState<string | null>(null)
   const [isSubmittingUserForm, setIsSubmittingUserForm] = useState(false)
+  const [selectedUmat, setSelectedUmat] = useState<UmatRecord | null>(null)
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   useEffect(() => {
@@ -324,12 +353,28 @@ function App() {
   }
 
   const handleSaveUmat = async () => {
-    if (!umatForm.nama) {
-      alert('Nama Umat harus diisi.')
+    if (!umatForm.nama.trim()) {
+      alert('Nama Anggota harus diisi.')
       return
     }
-    const newUmatList = siteContent.umat.filter((u: UmatRecord) => !u.isPending).filter((u: UmatRecord) => u.nama.toLowerCase() !== umatForm.nama.toLowerCase());
-    newUmatList.push({ ...umatForm, id: Date.now().toString(), isPending: false });
+
+    let newUmatList = [...siteContent.umat];
+    if (editingId) {
+      // Edit mode: replace the existing record
+      newUmatList = newUmatList.map(u => 
+        u.id === editingId ? { ...u, ...umatForm, isPending: false } : u
+      );
+    } else {
+      // Add mode: check if name already exists to avoid duplication
+      const nameExists = newUmatList.some(u => !u.isPending && u.nama.toLowerCase() === umatForm.nama.trim().toLowerCase());
+      if (nameExists) {
+        if (!window.confirm(`Anggota dengan nama "${umatForm.nama}" sudah ada. Apakah Anda ingin memperbarui datanya?`)) {
+          return;
+        }
+        newUmatList = newUmatList.filter(u => u.nama.toLowerCase() !== umatForm.nama.trim().toLowerCase());
+      }
+      newUmatList.push({ ...umatForm, id: Date.now().toString(), isPending: false });
+    }
 
     const newContent = { ...siteContent, umat: newUmatList }
     setSiteContent(newContent)
@@ -345,20 +390,19 @@ function App() {
       alert('Data Anggota Berhasil Disimpan!')
     } catch (error) {
       console.error("Gagal sinkron data anggota:", error)
+      alert('Gagal menyinkronkan data ke Google Drive.')
     }
-    setUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' })
+    setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' })
+    setEditingId(null)
     setAdminSearch('')
   }
 
-  const handleDeleteUmat = async (targetNama?: string) => {
-    const namaToSearch = targetNama || umatForm.nama
-    if (!namaToSearch) return
-
-    if (window.confirm(`Apakah Anda yakin ingin menghapus data anggota: ${namaToSearch}?`)) {
-      const newUmatList = siteContent.umat.filter(u => u.nama.toLowerCase() !== namaToSearch.toLowerCase())
-      const newContent = { ...siteContent, umat: newUmatList }
-      setSiteContent(newContent)
-      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
+  const handleDeleteUmat = async (id: string, name: string) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data anggota: ${name}?`)) {
+      const newUmatList = siteContent.umat.filter(u => u.id !== id);
+      const newContent = { ...siteContent, umat: newUmatList };
+      setSiteContent(newContent);
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
       try {
         await fetch(SCRIPT_URL, {
@@ -366,22 +410,22 @@ function App() {
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
-        })
-        alert('Data Anggota Berhasil Dihapus!')
+        });
+        alert('Data Anggota Berhasil Dihapus!');
       } catch (error) {
-        console.error("Gagal menghapus data anggota:", error)
+        console.error("Gagal menghapus data anggota:", error);
       }
 
-      if (!targetNama || targetNama.toLowerCase() === umatForm.nama.toLowerCase()) {
-        setUmatForm({ nama: '', status: 'Jemaat', nik: '', alamat: '', noHp: '', photo: '', kk: '' })
-        setAdminSearch('')
+      if (editingId === id) {
+        setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
+        setEditingId(null);
       }
     }
   }
 
   const handleApproveUmat = async (umat: UmatRecord) => {
-    const cleanList = siteContent.umat.filter(u => u.nama.toLowerCase() !== umat.nama.toLowerCase());
-    const officialUmat = { ...umat, isPending: false, id: Date.now().toString() };
+    const cleanList = siteContent.umat.filter(u => u.id !== umat.id && u.nama.toLowerCase() !== umat.nama.toLowerCase());
+    const officialUmat = { ...umat, isPending: false };
     const newUmatList = [...cleanList, officialUmat];
 
     const newContent = { ...siteContent, umat: newUmatList };
@@ -402,20 +446,27 @@ function App() {
   }
 
   const handleRejectUmat = async (id: string) => {
-    if (!window.confirm('Tolak dan hapus data revisi ini?')) return;
+    if (!window.confirm('Tolak dan hapus data pendaftaran ini?')) return;
     const newUmatList = siteContent.umat.filter(u => u.id !== id);
     const newContent = { ...siteContent, umat: newUmatList };
     setSiteContent(newContent);
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'updateUmat', data: newUmatList }),
+      });
+      alert('Pendaftaran berhasil ditolak/dihapus.');
+    } catch (error) {
+      console.error("Gagal sinkron tolak data:", error);
+    }
   }
 
   const handleUserSearch = () => {
-    if (!userSearch.trim()) return;
-    const results = siteContent.umat.filter(u =>
-      !u.isPending && u.nama.toLowerCase().includes(userSearch.toLowerCase())
-    );
-    setUserSearchResults(results);
-    setHasUserSearched(true);
+    setUserSearchQuery(userSearch.trim());
     setShowUserForm(false);
     setUserSubmitMessage(null);
   }
@@ -448,6 +499,7 @@ function App() {
     } finally {
       setIsSubmittingUserForm(false);
       setShowUserForm(false);
+      setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
     }
   }
 
@@ -800,6 +852,27 @@ function App() {
     )
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'kk', isAdmin = true) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran file tidak boleh lebih dari 5 MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        const compressed = await compressImage(base64, 800, 0.6);
+        if (isAdmin) {
+          setUmatForm(prev => ({ ...prev, [field]: compressed }));
+        } else {
+          setUserUmatForm(prev => ({ ...prev, [field]: compressed }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   const renderDataAnggota = () => {
     const pendingUmat = siteContent.umat.filter(u => u.isPending);
     const approvedUmat = siteContent.umat.filter(u => !u.isPending);
@@ -807,59 +880,153 @@ function App() {
       ? approvedUmat.filter(u => u.nama.toLowerCase().includes(adminSearch.toLowerCase()))
       : approvedUmat;
 
+    const filteredUserUmat = approvedUmat.filter(u =>
+      u.nama.toLowerCase().includes(userSearchQuery.toLowerCase())
+    );
+
     return (
       <div className="page-content">
         {isLoggedIn ? (
           <div className="admin-data-section">
             <h2>Kelola Data Anggota</h2>
             <div className="admin-data-form">
-              <h3>Form Input / Edit Anggota</h3>
+              <h3>{editingId ? 'Edit Data Anggota' : 'Form Input Anggota Baru'}</h3>
               <div className="form-grid">
-                <div className="form-group"><label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label><input type="text" value={umatForm.nama} onChange={e => setUmatForm({ ...umatForm, nama: e.target.value })} /></div>
-                <div className="form-group"><label>Status:</label>
+                <div className="form-group">
+                  <label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label>
+                  <input type="text" value={umatForm.nama} onChange={e => setUmatForm({ ...umatForm, nama: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Status Keanggotaan:</label>
                   <select value={umatForm.status} onChange={e => setUmatForm({ ...umatForm, status: e.target.value })}>
-                    <option value="Jemaat">Jemaat</option><option value="Anggota">Anggota</option><option value="Pengurus">Pengurus</option>
+                    <option value="Anggota">Anggota</option>
+                    <option value="Pengurus">Pengurus</option>
+                    <option value="Non Aktif">Non Aktif</option>
                   </select>
                 </div>
-                <div className="form-group"><label>NIK:</label><input type="text" value={umatForm.nik} onChange={e => setUmatForm({ ...umatForm, nik: e.target.value })} /></div>
-                <div className="form-group"><label>No. HP:</label><input type="text" value={umatForm.noHp} onChange={e => setUmatForm({ ...umatForm, noHp: e.target.value })} /></div>
-                <div className="form-group full-width"><label>Alamat:</label><textarea value={umatForm.alamat} onChange={e => setUmatForm({ ...umatForm, alamat: e.target.value })} /></div>
+                <div className="form-group">
+                  <label>NIK:</label>
+                  <input type="text" value={umatForm.nik} onChange={e => setUmatForm({ ...umatForm, nik: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>No. HP / WA:</label>
+                  <input type="text" value={umatForm.noHp} onChange={e => setUmatForm({ ...umatForm, noHp: e.target.value })} />
+                </div>
+                <div className="form-group full-width">
+                  <label>Alamat:</label>
+                  <textarea value={umatForm.alamat} onChange={e => setUmatForm({ ...umatForm, alamat: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
+                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'photo', true)} />
+                  {umatForm.photo && (
+                    <div className="preview-container">
+                      <img src={umatForm.photo} alt="Preview Foto" className="file-preview-img" />
+                      <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, photo: '' })}>Hapus Foto</button>
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>Upload KK (Kartu Keluarga - Opsional, Maksimal 5 MB):</label>
+                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'kk', true)} />
+                  {umatForm.kk && (
+                    <div className="preview-container">
+                      <img src={umatForm.kk} alt="Preview KK" className="file-preview-img" />
+                      <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, kk: '' })}>Hapus KK</button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="admin-action-buttons">
-                <button className="btn-save" onClick={handleSaveUmat}>Simpan Anggota</button>
-                <button className="btn-delete" onClick={() => handleDeleteUmat()}>Hapus Anggota</button>
+              <div className="admin-action-buttons" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button className="btn-save" onClick={handleSaveUmat}>
+                  {editingId ? 'Simpan Perubahan' : 'Tambah Anggota'}
+                </button>
+                {editingId && (
+                  <>
+                    <button 
+                      className="btn-delete" 
+                      onClick={() => {
+                        setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
+                        setEditingId(null);
+                      }}
+                      style={{ background: '#757575' }}
+                    >
+                      Batal Edit
+                    </button>
+                    <button className="btn-delete" onClick={() => handleDeleteUmat(editingId, umatForm.nama)}>
+                      Hapus Anggota
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            <div className="admin-umat-list">
+            
+            <div className="admin-umat-list" style={{ marginTop: '40px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h3>Daftar Anggota ({approvedUmat.length})</h3>
+                <h3>Daftar Anggota Resmi ({approvedUmat.length})</h3>
               </div>
-              <input type="text" placeholder="Cari Anggota..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '15px' }} />
+              <input type="text" placeholder="Cari Anggota Resmi..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '15px' }} />
               <div className="table-responsive">
                 <table className="umat-table admin-table">
-                  <thead><tr><th>No</th><th>Nama</th><th>Status</th><th>Aksi</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '60px' }}>No</th>
+                      <th>Nama</th>
+                      <th>Status</th>
+                      <th style={{ width: '220px' }}>Aksi</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {filteredAdminUmat.length > 0 ? filteredAdminUmat.map((u, idx) => (
-                      <tr key={u.id}><td>{idx + 1}</td><td style={{ fontWeight: '600' }}>{u.nama}</td><td>{u.status}</td>
-                        <td><div className="table-actions">
-                          <button className="btn-edit-small" onClick={() => setUmatForm({ nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk })}>Edit</button>
-                          <button className="btn-delete-small" onClick={() => handleDeleteUmat(u.nama)}>Hapus</button>
-                        </div></td>
+                      <tr key={u.id}>
+                        <td>{idx + 1}</td>
+                        <td style={{ fontWeight: '600' }}>{u.nama}</td>
+                        <td>
+                          <span className={`badge-status badge-${u.status.toLowerCase().replace(' ', '')}`}>{u.status}</span>
+                        </td>
+                        <td>
+                          <div className="table-actions">
+                            <button className="btn-edit-small" onClick={() => setSelectedUmat(u)} style={{ background: '#e3f2fd', color: '#0d47a1', border: '1px solid #bbdefb' }}>Detail</button>
+                            <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+                            <button className="btn-delete-small" onClick={() => handleDeleteUmat(u.id, u.nama)}>Hapus</button>
+                          </div>
+                        </td>
                       </tr>
-                    )) : <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px', color: '#888' }}>Tidak ada data anggota.</td></tr>}
+                    )) : <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px', color: '#888' }}>Tidak ada data anggota resmi.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
+
             {pendingUmat.length > 0 && (
               <div className="admin-umat-list" style={{ marginTop: '30px' }}>
-                <h3>Antrean Revisi Mandiri ({pendingUmat.length})</h3>
+                <h3>Antrean Persetujuan Mandiri ({pendingUmat.length})</h3>
                 <div className="table-responsive">
                   <table className="umat-table admin-table">
-                    <thead><tr><th>No</th><th>Nama</th><th>Aksi</th></tr></thead>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px' }}>No</th>
+                        <th>Nama</th>
+                        <th>Status Pengajuan</th>
+                        <th style={{ width: '250px' }}>Aksi</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {pendingUmat.map((u, idx) => (
-                        <tr key={u.id}><td>{idx + 1}</td><td style={{ fontWeight: '600' }}>{u.nama}</td><td><div className="table-actions"><button className="btn-save" style={{ padding: '6px 15px', fontSize: '0.8rem' }} onClick={() => handleApproveUmat(u)}>Simpan</button><button className="btn-delete" style={{ padding: '6px 15px', fontSize: '0.8rem', marginLeft: '8px' }} onClick={() => handleRejectUmat(u.id)}>Hapus</button></div></td></tr>
+                        <tr key={u.id}>
+                          <td>{idx + 1}</td>
+                          <td style={{ fontWeight: '600' }}>{u.nama}</td>
+                          <td>
+                            <span className="badge-status badge-pending-new">Menunggu Verifikasi</span>
+                          </td>
+                          <td>
+                            <div className="table-actions">
+                              <button className="btn-save" style={{ padding: '6px 12px', fontSize: '0.75rem', textTransform: 'none' }} onClick={() => handleApproveUmat(u)}>Approve</button>
+                              <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status || 'Anggota', nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+                              <button className="btn-delete-small" onClick={() => handleRejectUmat(u.id)}>Tolak</button>
+                            </div>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -870,45 +1037,197 @@ function App() {
         ) : (
           <div className="user-data-section">
             <div className="user-search-container" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <input type="text" placeholder="Cari Nama Anggota..." value={userSearch} onChange={e => setUserSearch(e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <input 
+                type="text" 
+                placeholder="Cari Nama Anggota..." 
+                value={userSearch} 
+                onChange={e => setUserSearch(e.target.value)} 
+                onKeyDown={e => { if (e.key === 'Enter') handleUserSearch(); }}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+              />
               <button className="btn-save" onClick={handleUserSearch} style={{ padding: '0 30px' }}>CARI</button>
+              {userSearchQuery && (
+                <button 
+                  className="btn-edit-small" 
+                  onClick={() => { setUserSearch(''); setUserSearchQuery(''); }}
+                  style={{ padding: '10px 15px', textTransform: 'none', letterSpacing: 0, fontWeight: 'normal' }}
+                >
+                  Reset
+                </button>
+              )}
             </div>
-            {hasUserSearched && (
-              <div className="search-results-section">
-                <div className="table-responsive">
-                  <table className="umat-table">
-                    <thead><tr><th>No</th><th>NAMA ANGGOTA</th></tr></thead>
-                    <tbody>
-                      {userSearchResults.length > 0 ? userSearchResults.map((result, idx) => (
-                        <tr key={result.id}><td>{idx + 1}</td><td>{result.nama}<div style={{ marginTop: '8px' }}><button className="btn-edit-small" onClick={() => { setUserUmatForm({ ...result }); setShowUserForm(true); setUserSubmitMessage(null); }}>revisi</button></div></td></tr>
-                      )) : <tr><td colSpan={2} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>Data Tidak Ditemukan</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-                {userSearchResults.length === 0 && (
-                  <div style={{ textAlign: 'center', marginTop: '20px' }}><button className="btn-save" onClick={() => { setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' }); setShowUserForm(true); setUserSubmitMessage(null); }}>Isi secara mandiri</button></div>
-                )}
+
+            <div className="search-results-section">
+              <div className="table-responsive">
+                <table className="umat-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '80px' }}>No</th>
+                      <th>Nama Anggota</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUserUmat.length > 0 ? (
+                      filteredUserUmat.map((u, idx) => (
+                        <tr key={u.id}>
+                          <td>{idx + 1}</td>
+                          <td>
+                            <button 
+                              onClick={() => setSelectedUmat(u)}
+                              style={{ 
+                                background: 'none', 
+                                border: 'none', 
+                                padding: 0, 
+                                color: '#1a73e8', 
+                                textDecoration: 'underline', 
+                                cursor: 'pointer', 
+                                fontWeight: '600',
+                                textTransform: 'none',
+                                letterSpacing: 'normal',
+                                textAlign: 'left'
+                              }}
+                            >
+                              {u.nama}
+                            </button>
+                          </td>
+                          <td>
+                            <span className={`badge-status badge-${u.status.toLowerCase().replace(' ', '')}`}>
+                              {u.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
+                          Data Anggota Tidak Ditemukan
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+
+              {filteredUserUmat.length === 0 && (
+                <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
+                  <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '15px' }}>
+                    Nama Anda belum terdaftar? Silakan isi data secara mandiri untuk mendaftar.
+                  </p>
+                  <button 
+                    className="btn-save" 
+                    onClick={() => { 
+                      setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' }); 
+                      setShowUserForm(true); 
+                      setUserSubmitMessage(null); 
+                    }}
+                    style={{ textTransform: 'none', fontSize: '1rem', padding: '12px 30px' }}
+                  >
+                    📝 Isi secara mandiri
+                  </button>
+                </div>
+              )}
+            </div>
+
             {showUserForm && (
-              <div className="user-input-form" style={{ marginTop: '40px', padding: '25px', background: '#f9f9f9', borderRadius: '12px', border: '1px solid #eee' }}>
-                <h3>Lengkapi Data Anggota</h3>
-                <div className="form-grid">
-                  <div className="form-group"><label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label><input type="text" value={userUmatForm.nama} onChange={e => setUserUmatForm({ ...userUmatForm, nama: e.target.value })} required /></div>
-                  <div className="form-group"><label>NIK:</label><input type="text" value={userUmatForm.nik} onChange={e => setUserUmatForm({ ...userUmatForm, nik: e.target.value })} /></div>
-                  <div className="form-group"><label>No. HP:</label><input type="text" value={userUmatForm.noHp} onChange={e => setUserUmatForm({ ...userUmatForm, noHp: e.target.value })} /></div>
-                  <div className="form-group full-width"><label>Alamat:</label><textarea value={userUmatForm.alamat} onChange={e => setUserUmatForm({ ...userUmatForm, alamat: e.target.value })} /></div>
-                  <div className="form-group"><label>Upload Photo (Maksimal 5 MB):</label><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const compressed = await compressImage(base64, 800, 0.6); setUserUmatForm({ ...userUmatForm, photo: compressed }); }; reader.readAsDataURL(file); } }} /></div>
-                  <div className="form-group"><label>Upload KK (Kartu Keluarga - Maksimal 5 MB):</label><input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const compressed = await compressImage(base64, 800, 0.6); setUserUmatForm({ ...userUmatForm, kk: compressed }); }; reader.readAsDataURL(file); } }} /></div>
+              <div className="modal-overlay" onClick={() => setShowUserForm(false)}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: '30px' }}>
+                  <button className="modal-header-btn" onClick={() => setShowUserForm(false)}>✕</button>
+                  <h3 style={{ borderBottom: '2px solid var(--secondary-color)', paddingBottom: '10px', marginTop: 0, color: 'var(--primary-color)' }}>
+                    Lengkapi Data Anggota Mandiri
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '20px' }}>
+                    Silakan isi formulir di bawah ini dengan lengkap. Data yang dikirim akan tersimpan di Google Drive dan masuk ke antrean verifikasi Admin.
+                  </p>
+                  
+                  <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
+                    <div className="form-group">
+                      <label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label>
+                      <input 
+                        type="text" 
+                        value={userUmatForm.nama} 
+                        onChange={e => setUserUmatForm({ ...userUmatForm, nama: e.target.value })} 
+                        required 
+                        placeholder="Nama Lengkap Anda"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>NIK (Nomor Induk Kependudukan - Opsional):</label>
+                      <input 
+                        type="text" 
+                        value={userUmatForm.nik} 
+                        onChange={e => setUserUmatForm({ ...userUmatForm, nik: e.target.value })} 
+                        placeholder="16 digit nomor NIK"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>No. HP / WhatsApp (Opsional):</label>
+                      <input 
+                        type="text" 
+                        value={userUmatForm.noHp} 
+                        onChange={e => setUserUmatForm({ ...userUmatForm, noHp: e.target.value })} 
+                        placeholder="Contoh: 081234567890"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Alamat Lengkap (Opsional):</label>
+                      <textarea 
+                        value={userUmatForm.alamat} 
+                        onChange={e => setUserUmatForm({ ...userUmatForm, alamat: e.target.value })} 
+                        placeholder="Alamat domisili saat ini di Banda Aceh dan sekitarnya"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileChange(e, 'photo', false)} 
+                      />
+                      {userUmatForm.photo && (
+                        <div className="preview-container">
+                          <img src={userUmatForm.photo} alt="Preview Foto" className="file-preview-img" />
+                          <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="form-group">
+                      <label>Upload KK (Kartu Keluarga - Opsional, Maksimal 5 MB):</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileChange(e, 'kk', false)} 
+                      />
+                      {userUmatForm.kk && (
+                        <div className="preview-container">
+                          <img src={userUmatForm.kk} alt="Preview KK" className="file-preview-img" />
+                          <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, kk: '' })}>Hapus KK</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '30px' }}>
+                    <button className="btn-delete" onClick={() => setShowUserForm(false)} style={{ textTransform: 'none' }}>
+                      Batal
+                    </button>
+                    <button className="btn-save" onClick={handleUserFormSubmit} disabled={isSubmittingUserForm} style={{ textTransform: 'none' }}>
+                      {isSubmittingUserForm ? 'Mengirim...' : 'Kirim Data'}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'center', marginTop: '30px' }}><button className="btn-save" onClick={handleUserFormSubmit} disabled={isSubmittingUserForm}>{isSubmittingUserForm ? 'Mengirim...' : 'KIRIM'}</button></div>
               </div>
             )}
-            {userSubmitMessage && <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: '600', border: '1px solid #c8e6c9' }}>{userSubmitMessage}</div>}
+            
+            {userSubmitMessage && (
+              <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: '600', border: '1px solid #c8e6c9' }}>
+                {userSubmitMessage}
+              </div>
+            )}
           </div>
         )}
       </div>
-    )
+    );
   }
 
   const renderPengurus = () => {
@@ -976,6 +1295,111 @@ function App() {
       </div>
     )
   }
+  const renderFormulirPendaftaranModal = () => {
+    if (!selectedUmat) return null;
+    return (
+      <div className="modal-overlay" onClick={() => setSelectedUmat(null)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <button className="modal-header-btn" onClick={() => setSelectedUmat(null)} title="Tutup">✕</button>
+          
+          <div className="form-print-area">
+            {/* Kop Surat */}
+            <div className="kop-surat">
+              <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" className="kop-logo" />
+              <div className="kop-text">
+                <h2>IKATAN MAHASISWA KELUARGA KARO BANDA ACEH SEKITAR</h2>
+                <p>Sekretariat: Banda Aceh, Prov. Aceh | Email: imkksa2006@gmail.com</p>
+                <p>Website: imkksa-karo.vercel.app | Didirikan: Tahun 2006</p>
+              </div>
+            </div>
+
+            <div className="form-title">
+              Formulir Pendaftaran Anggota
+            </div>
+
+            <div className="form-details-grid">
+              <div className="details-info">
+                <table className="details-table">
+                  <tbody>
+                    <tr>
+                      <td className="label-cell">Nama Lengkap</td>
+                      <td className="value-cell">: {selectedUmat.nama}</td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">NIK / No. KTP</td>
+                      <td className="value-cell">: {selectedUmat.nik || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">No. HP / WA</td>
+                      <td className="value-cell">: {selectedUmat.noHp || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">Alamat Lengkap</td>
+                      <td className="value-cell">: {selectedUmat.alamat || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">Status Keanggotaan</td>
+                      <td className="value-cell">
+                        : <span className={`badge-status badge-${selectedUmat.status.toLowerCase().replace(' ', '')}`}>{selectedUmat.status}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">Status Verifikasi</td>
+                      <td className="value-cell">
+                        : <span className="badge-approved" style={{ fontSize: '0.8rem' }}>TERVERIFIKASI ADMIN</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="details-photo-box">
+                {selectedUmat.photo ? (
+                  <img src={selectedUmat.photo} alt="Pas Foto" />
+                ) : (
+                  <div style={{ width: '120px', height: '160px', border: '2px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '10px' }}>
+                    Pas Foto 3x4
+                  </div>
+                )}
+                <span>Pas Foto Resmi</span>
+              </div>
+            </div>
+
+            {selectedUmat.kk && (
+              <div className="form-attachments">
+                <h4>Lampiran Dokumen: Kartu Keluarga (KK)</h4>
+                <img src={selectedUmat.kk} alt="Kartu Keluarga" className="attachment-kk" />
+              </div>
+            )}
+
+            {/* Bagian Tanda Tangan */}
+            <div className="signature-section">
+              <div className="signature-box">
+                <p>Banda Aceh, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <p style={{ fontWeight: 'bold' }}>Pengurus IMKKSA</p>
+                <div className="signature-space">
+                  {/* Decorative verified stamp */}
+                  <div style={{ border: '2px solid #2e7d32', color: '#2e7d32', width: '140px', padding: '5px', margin: '15px auto 0', transform: 'rotate(-5deg)', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    ✔ VERIFIED
+                  </div>
+                </div>
+                <p style={{ textDecoration: 'underline', fontWeight: 'bold' }}>Panitia Keanggotaan</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="modal-footer-actions">
+            <button className="btn-save" onClick={() => window.print()} style={{ textTransform: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🖨️ Cetak Formulir
+            </button>
+            <button className="btn-delete" onClick={() => setSelectedUmat(null)} style={{ textTransform: 'none' }}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -1009,6 +1433,7 @@ function App() {
       </nav>
       <main className="main-content">{renderPage()}</main>
       <footer className="footer">&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</footer>
+      {renderFormulirPendaftaranModal()}
     </div>
   )
 }
