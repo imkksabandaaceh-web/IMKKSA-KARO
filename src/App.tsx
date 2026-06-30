@@ -41,6 +41,16 @@ const compressImage = (base64: string, maxWidth: number, quality: number): Promi
   });
 };
 
+const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
+  if (!url) return '';
+  const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+  if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
+    const cleanUrl = url.split('?')[0];
+    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?tr=w-${width},q-80`;
+  }
+  return url;
+};
+
 // Types
 type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login';
 
@@ -921,7 +931,7 @@ function App() {
                   <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'photo', true)} />
                   {umatForm.photo && (
                     <div className="preview-container">
-                      <img src={umatForm.photo} alt="Preview Foto" className="file-preview-img" />
+                      <img src={toImageKitUrl(umatForm.photo, 400)} alt="Preview Foto" className="file-preview-img" />
                       <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, photo: '' })}>Hapus Foto</button>
                     </div>
                   )}
@@ -931,7 +941,7 @@ function App() {
                   <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'kk', true)} />
                   {umatForm.kk && (
                     <div className="preview-container">
-                      <img src={umatForm.kk} alt="Preview KK" className="file-preview-img" />
+                      <img src={toImageKitUrl(umatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
                       <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, kk: '' })}>Hapus KK</button>
                     </div>
                   )}
@@ -1186,7 +1196,7 @@ function App() {
                       />
                       {userUmatForm.photo && (
                         <div className="preview-container">
-                          <img src={userUmatForm.photo} alt="Preview Foto" className="file-preview-img" />
+                          <img src={toImageKitUrl(userUmatForm.photo, 400)} alt="Preview Foto" className="file-preview-img" />
                           <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
                         </div>
                       )}
@@ -1200,7 +1210,7 @@ function App() {
                       />
                       {userUmatForm.kk && (
                         <div className="preview-container">
-                          <img src={userUmatForm.kk} alt="Preview KK" className="file-preview-img" />
+                          <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
                           <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, kk: '' })}>Hapus KK</button>
                         </div>
                       )}
@@ -1355,7 +1365,7 @@ function App() {
 
               <div className="details-photo-box">
                 {selectedUmat.photo ? (
-                  <img src={selectedUmat.photo} alt="Pas Foto" />
+                  <img src={toImageKitUrl(selectedUmat.photo, 400)} alt="Pas Foto" />
                 ) : (
                   <div style={{ width: '120px', height: '160px', border: '2px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '10px' }}>
                     Pas Foto 3x4
@@ -1368,7 +1378,7 @@ function App() {
             {selectedUmat.kk && (
               <div className="form-attachments">
                 <h4>Lampiran Dokumen: Kartu Keluarga (KK)</h4>
-                <img src={selectedUmat.kk} alt="Kartu Keluarga" className="attachment-kk" />
+                <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" />
               </div>
             )}
 

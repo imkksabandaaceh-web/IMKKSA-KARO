@@ -11,11 +11,13 @@ Aplikasi web untuk informasi anggota IMKKSA Banda Aceh sekitar, dibangun menggun
   - Dashboard Admin untuk mengedit konten halaman secara langsung.
   - Integrasi dengan **Supabase** untuk tracking riwayat download proposal (real-time).
   - Integrasi dengan Google Apps Script (`SCRIPT_URL`) untuk penyimpanan konten halaman dan data umat.
+  - Integrasi dengan **ImageKit CDN Proxy** untuk seluruh media (Galeri & Foto/KK Anggota) demi kompatibilitas lintas-browser (Chrome, Firefox, Edge, Safari) dan optimalisasi bandwidth.
 - **Struktur File:**
   - `src/components/`: Berisi komponen UI seperti `LoginForm`, `AdminDashboard`, `DownloadProposal`, dll.
   - `src/services/auth.ts`: Logika autentikasi menggunakan Supabase.
   - `src/services/supabase.ts`: Konfigurasi dan klien Supabase.
   - `src/App.tsx`: Komponen utama yang mengatur routing, state aplikasi, dan polling data.
+  - `backup_IMKKSA_IMGKIT_764190.md`: Catatan cadangan untuk pengerjaan optimasi ImageKit di menu anggota.
 
 ## Panduan Pengembangan
 - Pastikan perubahan disinkronkan ke Google Drive melalui API yang tersedia.
