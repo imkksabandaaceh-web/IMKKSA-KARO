@@ -694,7 +694,7 @@ function App() {
                   <label>Keterangan (opsional):</label>
                   <input
                     type="text"
-                    placeholder="Contoh: Dilaksanakan di Gereja IMKKSA, 12 Juli 2026"
+                    placeholder="Contoh: Dilaksanakan di Sekretariat IMKKSA, 12 Juli 2026"
                     value={albumKeterangan}
                     onChange={e => setAlbumKeterangan(e.target.value)}
                     disabled={isAddingAlbum}
@@ -1317,9 +1317,9 @@ function App() {
             <div className="kop-surat">
               <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" className="kop-logo" />
               <div className="kop-text">
-                <h2>IKATAN MAHASISWA KELUARGA KARO BANDA ACEH SEKITAR</h2>
+                <h2>IKATAN MASYARAKAT KARO KRISTEN SADA ARIH BANDA ACEH SEKITAR</h2>
                 <p>Sekretariat: Banda Aceh, Prov. Aceh | Email: imkksa2006@gmail.com</p>
-                <p>Website: imkksa-karo.vercel.app | Didirikan: Tahun 2006</p>
+                <p>Website: https://www.imkksa-bandaaceh.site/ | Didirikan: Tahun 2006</p>
               </div>
             </div>
 
@@ -1378,7 +1378,16 @@ function App() {
             {selectedUmat.kk && (
               <div className="form-attachments">
                 <h4>Lampiran Dokumen: Kartu Keluarga (KK)</h4>
-                <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" />
+                {isLoggedIn ? (
+                  <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" />
+                ) : (
+                  <div className="kk-locked-box">
+                    <div className="kk-locked-content">
+                      <div className="kk-locked-icon">🔒</div>
+                      <p className="kk-locked-text">hanya admin yg bisa melihat tampilan KK</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
