@@ -168,13 +168,22 @@ function saveSiteData(data) {
 }
 
 function getOrCreateFolder(folderName) {
-  var folders = DriveApp.getFoldersByName(folderName);
-  if (folders.hasNext()) {
-    return folders.next();
-  } else {
-    var folder = DriveApp.createFolder(folderName);
-    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return folder;
+  try {
+    var folders = DriveApp.getFoldersByName(folderName);
+    if (folders.hasNext()) {
+      return folders.next();
+    } else {
+      var folder = DriveApp.createFolder(folderName);
+      try {
+        folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (shareErr) {
+        Logger.log("Gagal share folder: " + shareErr.toString());
+      }
+      return folder;
+    }
+  } catch (err) {
+    Logger.log("Gagal akses DriveApp: " + err.toString());
+    return null;
   }
 }
 
@@ -200,7 +209,11 @@ function uploadBase64ToFolder(base64Data, fileName, folder) {
     var blob = Utilities.newBlob(decoded, mimeType, fullFileName);
     
     var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      Logger.log("Gagal share file: " + shareErr.toString());
+    }
     
     var url = "https://lh3.googleusercontent.com/d/" + file.getId();
     return { success: true, url: url };
@@ -215,26 +228,41 @@ function saveUmatData(umatList) {
   for (var i = 0; i < umatList.length; i++) {
     var umat = umatList[i];
     
-    // Upload photo if it's base64 data
-    if (umat.photo && umat.photo.indexOf("data:") === 0) {
-      var fileName = "PHOTO_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
-      var uploadResult = uploadBase64ToFolder(umat.photo, fileName, folder);
-      if (uploadResult.success) {
-        umat.photo = uploadResult.url;
+    if (folder) {
+      // Upload photo if it's base64 data
+      if (umat.photo && umat.photo.indexOf("data:") === 0) {
+        var fileName = "PHOTO_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
+        var uploadResult = uploadBase64ToFolder(umat.photo, fileName, folder);
+        if (uploadResult.success) {
+          umat.photo = uploadResult.url;
+        }
       }
-    }
-    
-    // Upload KK if it's base64 data
-    if (umat.kk && umat.kk.indexOf("data:") === 0) {
-      var fileName = "KK_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
-      var uploadResult = uploadBase64ToFolder(umat.kk, fileName, folder);
-      if (uploadResult.success) {
-        umat.kk = uploadResult.url;
+      
+      // Upload KK if it's base64 data
+      if (umat.kk && umat.kk.indexOf("data:") === 0) {
+        var fileName = "KK_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
+        var uploadResult = uploadBase64ToFolder(umat.kk, fileName, folder);
+        if (uploadResult.success) {
+          umat.kk = uploadResult.url;
+        }
       }
     }
   }
   
-  setLargeProperty("umat", JSON.stringify(umatList));
+  try {
+    setLargeProperty("umat", JSON.stringify(umatList));
+  } catch (propErr) {
+    Logger.log("Gagal menyimpan data umat lengkap, membersihkan base64: " + propErr.toString());
+    for (var i = 0; i < umatList.length; i++) {
+      if (umatList[i].photo && umatList[i].photo.indexOf("data:") === 0) {
+        umatList[i].photo = "";
+      }
+      if (umatList[i].kk && umatList[i].kk.indexOf("data:") === 0) {
+        umatList[i].kk = "";
+      }
+    }
+    setLargeProperty("umat", JSON.stringify(umatList));
+  }
 }
 
 function saveGaleriAlbumData(albumList) {

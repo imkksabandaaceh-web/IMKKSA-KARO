@@ -268,7 +268,7 @@ function App() {
             ...prev,
             settings: data.settings ? { ...DEFAULT_CONTENT.settings, ...data.settings } : prev.settings,
             pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : prev.pages,
-            umat: (data.umat && data.umat.length > 0) ? data.umat : prev.umat,
+            umat: data.umat !== undefined ? data.umat : prev.umat,
             pengurus: currentParsedPengurus,
             galeri: data.galeri || prev.galeri || [],
             galeriAlbum: data.galeriAlbum || prev.galeriAlbum || []
