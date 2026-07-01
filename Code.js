@@ -86,13 +86,26 @@ function doPost(e) {
     
     if (action === "updateContent") {
       saveSiteData(data);
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+                           .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "updateUmat") {
       saveUmatData(data);
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+                           .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "updateGaleriAlbum") {
       saveGaleriAlbumData(data);
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "uploadImage") {
+      var folder = getOrCreateFolder("IMKKSA_Beranda_Images");
+      if (!folder) throw new Error("Gagal mengakses folder Google Drive");
+      var fileName = "IMG_" + Date.now();
+      var uploadResult = uploadBase64ToFolder(data.base64, fileName, folder);
+      return ContentService.createTextOutput(JSON.stringify(uploadResult))
+                           .setMimeType(ContentService.MimeType.JSON);
     }
     
-    return ContentService.createTextOutput(JSON.stringify({ success: true }))
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Action tidak dikenal" }))
                          .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
@@ -147,11 +160,46 @@ function getLargeProperty(key, defaultValue) {
 }
 
 function getSiteData() {
-  var settings = JSON.parse(getLargeProperty("settings", '{"logo": "/LOGO_KARO.jpg", "title": "IMKKSA Banda Aceh Sekitar"}'));
-  var pages = JSON.parse(getLargeProperty("pages", '{}'));
-  var umat = JSON.parse(getLargeProperty("umat", '[]'));
-  var pengurus = JSON.parse(getLargeProperty("pengurus", '[]'));
-  var galeriAlbum = JSON.parse(getLargeProperty("galeriAlbum", '[]'));
+  var settings = {"logo": "/LOGO_KARO.jpg", "title": "IMKKSA Banda Aceh Sekitar"};
+  var pages = {};
+  var umat = [];
+  var pengurus = [];
+  var galeriAlbum = [];
+  
+  try {
+    var settingsStr = getLargeProperty("settings", null);
+    if (settingsStr) settings = JSON.parse(settingsStr);
+  } catch (e) {
+    Logger.log("Error parsing settings: " + e.toString());
+  }
+  
+  try {
+    var pagesStr = getLargeProperty("pages", null);
+    if (pagesStr) pages = JSON.parse(pagesStr);
+  } catch (e) {
+    Logger.log("Error parsing pages: " + e.toString());
+  }
+  
+  try {
+    var umatStr = getLargeProperty("umat", null);
+    if (umatStr) umat = JSON.parse(umatStr);
+  } catch (e) {
+    Logger.log("Error parsing umat: " + e.toString());
+  }
+  
+  try {
+    var pengurusStr = getLargeProperty("pengurus", null);
+    if (pengurusStr) pengurus = JSON.parse(pengurusStr);
+  } catch (e) {
+    Logger.log("Error parsing pengurus: " + e.toString());
+  }
+  
+  try {
+    var galeriAlbumStr = getLargeProperty("galeriAlbum", null);
+    if (galeriAlbumStr) galeriAlbum = JSON.parse(galeriAlbumStr);
+  } catch (e) {
+    Logger.log("Error parsing galeriAlbum: " + e.toString());
+  }
   
   return {
     settings: settings,

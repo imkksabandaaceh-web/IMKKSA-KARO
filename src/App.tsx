@@ -1288,18 +1288,35 @@ function App() {
     const currentPage = siteContent.pages[activeTab]
     if (!currentPage) return null
 
+    // Helper untuk mengubah Google Drive link di HTML content menjadi ImageKit CDN proxy
+    const renderContentHtml = (htmlContent: string) => {
+      let content = htmlContent || '';
+      content = content.replace(/&nbsp;/g, ' ');
+      
+      const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+      if (endpoint) {
+        // Ganti semua https://lh3.googleusercontent.com/d/FILE_ID menjadi ImageKit CDN proxy
+        const regex = /https:\/\/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/g;
+        content = content.replace(regex, (match, fileId) => {
+          return `${endpoint}/d/${fileId}?tr=w-800,q-80`;
+        });
+      }
+      return { __html: content };
+    };
+
     return (
       <div className="page-content">
         {!isLoggedIn ? (
           <div className="page-card">
             <h2>{currentPage.title}</h2>
-            <div className="content-body" dangerouslySetInnerHTML={{ __html: (currentPage.content || '').replace(/&nbsp;/g, ' ') }} />
+            <div className="content-body" dangerouslySetInnerHTML={renderContentHtml(currentPage.content)} />
           </div>
         ) : (
           <AdminDashboard
             initialTitle={editTitle || ''} initialContent={editContent || ''} initialSiteTitle={editSiteTitle || ''} initialSiteLogo={editLogo || ''}
             onSave={(data: any) => { setEditTitle(data.title || ''); setEditContent(data.content || ''); setEditSiteTitle(data.siteTitle || ''); setEditLogo(data.siteLogo || ''); }}
             onPublish={(data: any) => saveChanges(data)} isSaving={isSaving}
+            scriptUrl={SCRIPT_URL}
           />
         )}
       </div>

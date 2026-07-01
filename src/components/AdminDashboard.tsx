@@ -11,12 +11,13 @@ interface AdminDashboardProps {
   onSave: (data: any) => void;
   onPublish: (data: any) => void;
   isSaving: boolean;
+  scriptUrl: string;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   initialTitle, initialContent,
   initialSiteTitle, initialSiteLogo,
-  onSave, onPublish, isSaving
+  onSave, onPublish, isSaving, scriptUrl
 }) => {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
@@ -54,6 +55,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             setTitle={setTitle}
             content={content}
             setContent={setContent}
+            scriptUrl={scriptUrl}
           />
         </div>
 

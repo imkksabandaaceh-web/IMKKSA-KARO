@@ -9,9 +9,10 @@ interface EditorUtamaProps {
   setTitle: (title: string) => void;
   content: string;
   setContent: (content: string) => void;
+  scriptUrl: string;
 }
 
-const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, setContent }) => {
+const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, setContent, scriptUrl }) => {
   const quillRef = useRef<ReactQuill>(null);
 
   const imageHandler = () => {
@@ -32,7 +33,37 @@ const EditorUtama: React.FC<EditorUtamaProps> = ({ title, setTitle, content, set
           if (quill) {
             const range = quill.getSelection();
             if (range) {
-              quill.insertEmbed(range.index, 'image', compressed);
+              // Menampilkan placeholder loading sementara proses upload ke Google Drive
+              const placeholderIndex = range.index;
+              quill.insertText(placeholderIndex, '[Mengunggah gambar...]');
+              
+              try {
+                const response = await fetch(scriptUrl, {
+                  method: 'POST',
+                  mode: 'cors',
+                  headers: { 'Content-Type': 'text/plain' },
+                  body: JSON.stringify({
+                    action: 'uploadImage',
+                    data: { base64: compressed }
+                  })
+                });
+                const result = await response.json();
+                
+                // Hapus tulisan loading
+                quill.deleteText(placeholderIndex, '[Mengunggah gambar...]'.length);
+                
+                if (result.success && result.url) {
+                  quill.insertEmbed(placeholderIndex, 'image', result.url);
+                } else {
+                  console.error("Gagal unggah gambar:", result.error);
+                  alert("Gagal mengunggah gambar ke Google Drive: " + (result.error || "Error tidak diketahui"));
+                }
+              } catch (err) {
+                // Hapus tulisan loading
+                quill.deleteText(placeholderIndex, '[Mengunggah gambar...]'.length);
+                console.error("Error upload gambar ke Google Drive:", err);
+                alert("Terjadi kesalahan saat mengunggah gambar: " + (err instanceof Error ? err.message : String(err)));
+              }
             }
           }
         };
