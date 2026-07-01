@@ -222,7 +222,20 @@ function uploadBase64ToFolder(base64Data, fileName, folder) {
   }
 }
 
+function testGoogleDrive() {
+  var folder = getOrCreateFolder("IMKKSA_Anggota_Dokumen");
+  if (folder) {
+    Logger.log("Koneksi Google Drive Sukses! Folder ID: " + folder.getId());
+  } else {
+    Logger.log("Koneksi Google Drive Gagal!");
+  }
+}
+
 function saveUmatData(umatList) {
+  if (!umatList) {
+    Logger.log("saveUmatData dipanggil tanpa parameter (umatList kosong).");
+    return;
+  }
   var folder = getOrCreateFolder("IMKKSA_Anggota_Dokumen");
   
   for (var i = 0; i < umatList.length; i++) {
