@@ -47,3 +47,17 @@ export const compressImage = (base64Str: string, maxWidth = 800, quality = 0.7):
     };
   });
 };
+
+/**
+ * Konversi URL lh3.googleusercontent.com -> ImageKit proxy.
+ * Jika ImageKit belum dikonfigurasi, gunakan format asli.
+ */
+export const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
+  if (!url) return '';
+  const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+  if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
+    const cleanUrl = url.split('?')[0];
+    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?tr=w-${width},q-80`;
+  }
+  return url;
+};

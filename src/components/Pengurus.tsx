@@ -1,4 +1,6 @@
 
+import { toImageKitUrl } from '../utils/imageUtils'
+
 interface PengurusRecord {
   id: string
   jabatan: string
@@ -19,7 +21,7 @@ export default function Pengurus({ data }: Props) {
         {data.map((p) => (
           <div className="pengurus-card" key={p.id}>
             <img
-              src={p.photo || '/LOGO_KARO.jpg'}
+              src={toImageKitUrl(p.photo || '/LOGO_KARO.jpg', 400)}
               alt={p.nama}
               className="pengurus-photo"
             />

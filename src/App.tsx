@@ -528,7 +528,41 @@ function App() {
 
   const handleSavePengurus = async () => {
     if (!pengurusForm.nama) { alert('Nama pengurus harus diisi.'); return; }
-    const newPengurus: PengurusRecord = { ...pengurusForm, id: Date.now().toString() };
+    
+    let photoUrl = pengurusForm.photo || '';
+    
+    // Jika foto adalah base64 data, upload ke Google Drive terlebih dahulu
+    if (photoUrl && photoUrl.startsWith('data:image')) {
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action: 'uploadImage',
+            data: { base64: photoUrl }
+          })
+        });
+        const result = await res.json();
+        if (result.success && result.url) {
+          photoUrl = result.url;
+        } else {
+          console.error("Gagal unggah foto pengurus ke Drive:", result.error);
+          alert("Gagal mengunggah foto pengurus ke Google Drive: " + (result.error || "Error tidak diketahui"));
+          return;
+        }
+      } catch (err) {
+        console.error("Error upload foto pengurus:", err);
+        alert("Gagal mengunggah foto pengurus: " + (err instanceof Error ? err.message : String(err)));
+        return;
+      }
+    }
+
+    const newPengurus: PengurusRecord = { 
+      ...pengurusForm, 
+      photo: photoUrl, 
+      id: Date.now().toString() 
+    };
     const updatedPengurus = [...(siteContent.pengurus || []).filter(p => p.jabatan !== pengurusForm.jabatan), newPengurus];
     const newContent = {
       ...siteContent,
@@ -1249,7 +1283,7 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={p.photo} alt={p.nama} className="pengurus-photo" />}
+                {p.photo && <img src={toImageKitUrl(p.photo, 400)} alt={p.nama} className="pengurus-photo" />}
                 <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}

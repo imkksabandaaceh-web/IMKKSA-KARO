@@ -1,4 +1,6 @@
 
+import { toImageKitUrl } from '../utils/imageUtils'
+
 interface PengurusRecord {
   id: string
   jabatan: string
@@ -108,7 +110,7 @@ export default function PengurusAdmin({
           >
 
             <img
-              src={p.photo}
+              src={toImageKitUrl(p.photo, 400)}
               alt={p.nama}
               className="pengurus-photo"
             />

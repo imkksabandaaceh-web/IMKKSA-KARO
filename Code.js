@@ -175,7 +175,28 @@ function getSiteData() {
   
   try {
     var pagesStr = getLargeProperty("pages", null);
-    if (pagesStr) pages = JSON.parse(pagesStr);
+    if (pagesStr) {
+      try {
+        pages = JSON.parse(pagesStr);
+      } catch (jsonErr) {
+        Logger.log("Error parsing pages, attempting recovery: " + jsonErr.toString());
+        var base64Idx = pagesStr.indexOf("data:image");
+        if (base64Idx !== -1) {
+          var imgStartIdx = pagesStr.lastIndexOf("<img src=\\\"", base64Idx);
+          if (imgStartIdx !== -1) {
+            // Reconstruct a valid JSON closing by replacing the massive base64 string
+            var testStr = pagesStr.substring(0, imgStartIdx) + ' (Gambar dihapus karena format base64 terlalu besar, silakan upload kembali)<\/p>\"}}';
+            try {
+              pages = JSON.parse(testStr);
+              setLargeProperty("pages", testStr);
+              Logger.log("Pages recovery successful!");
+            } catch (err2) {
+              Logger.log("Pages recovery failed: " + err2.toString());
+            }
+          }
+        }
+      }
+    }
   } catch (e) {
     Logger.log("Error parsing pages: " + e.toString());
   }
