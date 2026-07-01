@@ -11,6 +11,7 @@
 * **Gejala Cache Lokal:** Karena server gagal menyimpan, data hanya tersimpan di cache lokal `localStorage` Chrome tempat umat mendaftar. Ketika admin login di Chrome, antrean terlihat (karena membaca cache lokal), tetapi saat login di Firefox/Edge antrean bernilai `0` karena server-nya memang kosong.
 * **Perbaikan Apps Script (`Code.js`):** Menambahkan blok `try-catch` di seluruh operasi Google Drive agar jika proses unggah foto gagal/diblokir, script tidak crash dan **data teks pendaftaran anggota tetap tersimpan sukses** di server. Juga menambahkan fitur pengujian koneksi `testGoogleDrive()`.
 * **Perbaikan React Frontend (`App.tsx`):** Memperbaiki logika sinkronisasi penggabungan data anggota agar browser secara aktif memuat data terbaru dari server walaupun server mengirimkan daftar umat kosong `[]` (misal saat data terhapus/bersih), dan hanya menggunakan cache lokal jika fetch database mengalami kegagalan (`undefined`).
+* **Integrasi Tawk.to Live-Chat:** Menambahkan widget live-chat tawk.to di sudut kanan bawah semua halaman website dengan menanamkan script dari Tawk.to ke dalam `index.html` tepat sebelum tag penutup `</body>`.
 
 ---
 
@@ -22,19 +23,20 @@
 * Proteksi try-catch pada pembuatan folder, file, dan pembagian hak akses (sharing) agar kegagalan unggah tidak merusak penyimpanan data teks umat.
 * Penambahan mekanisme pembersihan base64 otomatis jika ukuran total data melebihi batas simpan properti Google Apps Script.
 
-### B. Frontend - React ([App.tsx](file:///C:/Users/HP/karo/src/App.tsx))
-Perubahan logika merging data umat agar sinkron dengan status server:
-```diff
-- umat: (data.umat && data.umat.length > 0) ? data.umat : prev.umat,
-+ umat: data.umat !== undefined ? data.umat : prev.umat,
-```
+### B. Frontend - React ([App.tsx](file:///C:/Users/HP/karo/src/App.tsx) & [index.html](file:///C:/Users/HP/karo/index.html))
+* Perubahan logika merging data umat agar sinkron dengan status server di `App.tsx`:
+  ```diff
+  - umat: (data.umat && data.umat.length > 0) ? data.umat : prev.umat,
+  + umat: data.umat !== undefined ? data.umat : prev.umat,
+  ```
+* Penanaman script integrasi tawk.to widget di `index.html` tepat sebelum tag `</body>` agar chat widget tampil otomatis di sudut kanan bawah.
 
 ---
 
 ## 3. Status Terakhir Proyek
 * **Penyebaran (Deploy):** Google Apps Script dideploy ulang ke **Deployment Versi 8** (URL tetap sama, tidak perlu mengubah konfigurasi web).
 * **Verifikasi Koneksi:** Fungsi `testGoogleDrive` telah dijalankan secara manual di Apps Script Editor dan mencatat status **Sukses** dengan Folder ID: `19OzmBvYozkl1xLOPjPjV8lIWJopXsqx7`.
-* **Frontend Build & Push:** Kode frontend React terbaru telah sukses di-build dan di-push ke GitHub untuk pembaruan otomatis di Vercel.
+* **Frontend Build & Push:** Kode frontend React terbaru beserta widget Tawk.to dan perbaikan backend telah sukses di-build dan di-push ke GitHub untuk pembaruan otomatis di Vercel.
 
 ---
 *Jika Anda memulai sesi obrolan baru dengan asisten AI, Anda cukup memberikan kode **`IMKKSA-SYNC-595386`** dan memintanya membaca file ini agar langsung memahami kemajuan terakhir.*
