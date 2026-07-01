@@ -18,6 +18,7 @@ Aplikasi web untuk informasi anggota IMKKSA Banda Aceh sekitar, dibangun menggun
   - `src/services/supabase.ts`: Konfigurasi dan klien Supabase.
   - `src/App.tsx`: Komponen utama yang mengatur routing, state aplikasi, dan polling data.
   - `backup_IMKKSA_IMGKIT_764190.md`: Catatan cadangan untuk pengerjaan optimasi ImageKit di menu anggota.
+  - `backup_IMKKSA_SYNC_595386.md`: Catatan cadangan untuk perbaikan sinkronisasi data umat dan antrean verifikasi di semua browser.
 
 ## Panduan Pengembangan
 - Pastikan perubahan disinkronkan ke Google Drive melalui API yang tersedia.
