@@ -255,10 +255,13 @@ function App() {
         });
 
         setSiteContent(prev => {
-          let currentParsedPengurus = prev.pengurus;
+          let currentParsedPengurus = data.pengurus !== undefined ? data.pengurus : prev.pengurus;
           if (data.settings && data.settings.pengurusRaw) {
             try {
-              currentParsedPengurus = JSON.parse(data.settings.pengurusRaw);
+              const parsedRaw = JSON.parse(data.settings.pengurusRaw);
+              if (Array.isArray(parsedRaw) && parsedRaw.length > 0 && (!currentParsedPengurus || currentParsedPengurus.length === 0)) {
+                currentParsedPengurus = parsedRaw;
+              }
             } catch (e) {
               console.error("Gagal parse pengurusRaw:", e);
             }
@@ -315,6 +318,70 @@ function App() {
     }
   }, [isLoggedIn, activeTab, siteContent])
 
+  // Auto-migrate base64 pengurus photos to Google Drive
+  useEffect(() => {
+    if (!isLoggedIn || !siteContent.pengurus || siteContent.pengurus.length === 0) return;
+
+    const migrateBase64Photos = async () => {
+      let changed = false;
+      const updatedPengurus = await Promise.all(
+        siteContent.pengurus.map(async (p) => {
+          if (p.photo && p.photo.startsWith('data:image')) {
+            try {
+              console.log(`[Auto-Migration] Mengunggah foto base64 untuk pengurus: ${p.nama}...`);
+              const res = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                  action: 'uploadImage',
+                  data: { base64: p.photo }
+                })
+              });
+              const result = await res.json();
+              if (result.success && result.url) {
+                changed = true;
+                return { ...p, photo: result.url };
+              } else {
+                console.error(`Gagal migrasi foto untuk ${p.nama}:`, result.error);
+              }
+            } catch (err) {
+              console.error(`Error migrasi foto untuk ${p.nama}:`, err);
+            }
+          }
+          return p;
+        })
+      );
+
+      if (changed) {
+        const newContent = {
+          ...siteContent,
+          pengurus: updatedPengurus,
+          settings: {
+            ...siteContent.settings,
+            pengurusRaw: JSON.stringify(updatedPengurus)
+          }
+        };
+        setSiteContent(newContent);
+        localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+        try {
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'updateContent', data: newContent }),
+          });
+          console.log("Berhasil migrasi foto pengurus ke Google Drive & ImageKit!");
+          alert("Sistem mendeteksi foto pengurus dalam format Base64 dan telah berhasil memindahkannya secara otomatis ke Google Drive & ImageKit Proxy!");
+        } catch (error) {
+          console.error("Gagal sinkron pengurus hasil migrasi:", error);
+        }
+      }
+    };
+
+    migrateBase64Photos();
+  }, [isLoggedIn, siteContent.pengurus]);
+
   const handleLogout = () => {
     setIsLoggedIn(false)
     setActiveTab('Beranda')
@@ -332,7 +399,7 @@ function App() {
       settings: {
         logo: finalLogo,
         title: finalSiteTitle,
-        pengurusRaw: siteContent.settings.pengurusRaw
+        pengurusRaw: JSON.stringify(siteContent.pengurus || [])
       },
       pages: {
         ...siteContent.pages,

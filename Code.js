@@ -234,6 +234,7 @@ function getSiteData() {
 function saveSiteData(data) {
   if (data.settings) setLargeProperty("settings", JSON.stringify(data.settings));
   if (data.pages) setLargeProperty("pages", JSON.stringify(data.pages));
+  if (data.pengurus) setLargeProperty("pengurus", JSON.stringify(data.pengurus));
 }
 
 function getOrCreateFolder(folderName) {
