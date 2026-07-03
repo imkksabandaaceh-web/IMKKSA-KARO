@@ -43,11 +43,38 @@ const compressImage = (base64: string, maxWidth: number, quality: number): Promi
 
 const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
   if (!url) return '';
-  const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+  const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
+  
+  if (url.includes('ik.imagekit.io')) {
+    const cleanUrl = url.split('?')[0];
+    return `${cleanUrl}?tr=w-${width},q-80`;
+  }
+
+  let fileId = '';
+  const lhMatch = url.match(/lh\d+\.googleusercontent\.com\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
+  if (lhMatch) {
+    fileId = lhMatch[1];
+  } else {
+    const driveIdMatch = url.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+    if (driveIdMatch) {
+      fileId = driveIdMatch[1];
+    } else {
+      const drivePathMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (drivePathMatch) {
+        fileId = drivePathMatch[1];
+      }
+    }
+  }
+
+  if (fileId && endpoint) {
+    return `${endpoint}/d/${fileId}?tr=w-${width},q-80`;
+  }
+
   if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
     const cleanUrl = url.split('?')[0];
     return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?tr=w-${width},q-80`;
   }
+
   return url;
 };
 
@@ -59,48 +86,71 @@ const processHtmlContent = (htmlContent: string): string => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(content, 'text/html');
     const links = doc.querySelectorAll('a');
-    const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+    const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
 
     links.forEach((a) => {
       let href = a.getAttribute('href') || '';
       if (!href) return;
       href = href.trim();
 
-      // Check if the link target is an image file
+      let fileId = '';
+      const lhMatch = href.match(/lh\d+\.googleusercontent\.com\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
+      if (lhMatch) {
+        fileId = lhMatch[1];
+      } else {
+        const driveIdMatch = href.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+        if (driveIdMatch) {
+          fileId = driveIdMatch[1];
+        } else {
+          const drivePathMatch = href.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+          if (drivePathMatch) {
+            fileId = drivePathMatch[1];
+          }
+        }
+      }
+
       const isImage = /\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(href) || 
-                      href.includes('googleusercontent.com/d/') ||
+                      fileId !== '' ||
                       (endpoint && href.includes(endpoint.replace('https://', '')));
 
       if (isImage) {
-        // Ganti Google Drive url jika ada ke ImageKit jika ada endpoint
-        if (endpoint) {
-          const gdMatch = href.match(/https:\/\/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
-          if (gdMatch) {
-            href = `${endpoint}/d/${gdMatch[1]}?tr=w-800,q-80`;
-          }
+        if (fileId && endpoint) {
+          href = `${endpoint}/d/${fileId}?tr=w-800,q-80`;
         }
         
-        // Ubah link menjadi tag img
         const img = doc.createElement('img');
         img.setAttribute('src', href);
         img.setAttribute('alt', a.textContent || 'Gambar');
         img.setAttribute('style', 'max-width: 100%; height: auto; display: block; margin: 10px 0; border-radius: 8px;');
         a.parentNode?.replaceChild(img, a);
       } else {
-        // Jika bukan gambar, pastikan link membuka tab baru
         a.setAttribute('target', '_blank');
         a.setAttribute('rel', 'noopener noreferrer');
       }
     });
 
-    // Perbarui juga gambar yang sudah berupa tag img agar menggunakan ImageKit CDN
     if (endpoint) {
       const imgs = doc.querySelectorAll('img');
       imgs.forEach((img) => {
         const src = img.getAttribute('src') || '';
-        const gdMatch = src.match(/https:\/\/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
-        if (gdMatch) {
-          img.setAttribute('src', `${endpoint}/d/${gdMatch[1]}?tr=w-800,q-80`);
+        let fileId = '';
+        const lhMatch = src.match(/lh\d+\.googleusercontent\.com\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
+        if (lhMatch) {
+          fileId = lhMatch[1];
+        } else {
+          const driveIdMatch = src.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+          if (driveIdMatch) {
+            fileId = driveIdMatch[1];
+          } else {
+            const drivePathMatch = src.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (drivePathMatch) {
+              fileId = drivePathMatch[1];
+            }
+          }
+        }
+
+        if (fileId) {
+          img.setAttribute('src', `${endpoint}/d/${fileId}?tr=w-800,q-80`);
         }
       });
     }

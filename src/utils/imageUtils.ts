@@ -49,15 +49,42 @@ export const compressImage = (base64Str: string, maxWidth = 800, quality = 0.7):
 };
 
 /**
- * Konversi URL lh3.googleusercontent.com -> ImageKit proxy.
+ * Konversi URL Google Drive/lh3.googleusercontent.com -> ImageKit proxy.
  * Jika ImageKit belum dikonfigurasi, gunakan format asli.
  */
 export const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
   if (!url) return '';
-  const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+  const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
+  
+  if (url.includes('ik.imagekit.io')) {
+    const cleanUrl = url.split('?')[0];
+    return `${cleanUrl}?tr=w-${width},q-80`;
+  }
+
+  let fileId = '';
+  const lhMatch = url.match(/lh\d+\.googleusercontent\.com\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
+  if (lhMatch) {
+    fileId = lhMatch[1];
+  } else {
+    const driveIdMatch = url.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+    if (driveIdMatch) {
+      fileId = driveIdMatch[1];
+    } else {
+      const drivePathMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (drivePathMatch) {
+        fileId = drivePathMatch[1];
+      }
+    }
+  }
+
+  if (fileId && endpoint) {
+    return `${endpoint}/d/${fileId}?tr=w-${width},q-80`;
+  }
+
   if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
     const cleanUrl = url.split('?')[0];
     return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?tr=w-${width},q-80`;
   }
+
   return url;
 };

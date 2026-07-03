@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 // ── Konfigurasi ──────────────────────────────────────────────────────────────
-const IMAGEKIT_ENDPOINT = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+const IMAGEKIT_ENDPOINT = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
 
 // Konversi URL lh3.googleusercontent.com → ImageKit proxy
 // Jika ImageKit belum dikonfigurasi, gunakan Google Drive thumbnail yang kompatibel dengan semua browser (Chrome, Firefox, Edge, Safari)
