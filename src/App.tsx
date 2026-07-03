@@ -51,6 +51,68 @@ const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
   return url;
 };
 
+const processHtmlContent = (htmlContent: string): string => {
+  let content = htmlContent || '';
+  content = content.replace(/&nbsp;/g, ' ');
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    const links = doc.querySelectorAll('a');
+    const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
+
+    links.forEach((a) => {
+      let href = a.getAttribute('href') || '';
+      if (!href) return;
+      href = href.trim();
+
+      // Check if the link target is an image file
+      const isImage = /\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(href) || 
+                      href.includes('googleusercontent.com/d/') ||
+                      (endpoint && href.includes(endpoint.replace('https://', '')));
+
+      if (isImage) {
+        // Ganti Google Drive url jika ada ke ImageKit jika ada endpoint
+        if (endpoint) {
+          const gdMatch = href.match(/https:\/\/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+          if (gdMatch) {
+            href = `${endpoint}/d/${gdMatch[1]}?tr=w-800,q-80`;
+          }
+        }
+        
+        // Ubah link menjadi tag img
+        const img = doc.createElement('img');
+        img.setAttribute('src', href);
+        img.setAttribute('alt', a.textContent || 'Gambar');
+        img.setAttribute('style', 'max-width: 100%; height: auto; display: block; margin: 10px 0; border-radius: 8px;');
+        a.parentNode?.replaceChild(img, a);
+      } else {
+        // Jika bukan gambar, pastikan link membuka tab baru
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+
+    // Perbarui juga gambar yang sudah berupa tag img agar menggunakan ImageKit CDN
+    if (endpoint) {
+      const imgs = doc.querySelectorAll('img');
+      imgs.forEach((img) => {
+        const src = img.getAttribute('src') || '';
+        const gdMatch = src.match(/https:\/\/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+        if (gdMatch) {
+          img.setAttribute('src', `${endpoint}/d/${gdMatch[1]}?tr=w-800,q-80`);
+        }
+      });
+    }
+
+    return doc.body.innerHTML;
+  } catch (err) {
+    console.error('Error parsing HTML content in processHtmlContent:', err);
+    return content;
+  }
+};
+
+
 // Types
 type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login';
 
@@ -390,7 +452,7 @@ function App() {
   const saveChanges = async (updatedData?: any) => {
     setIsSaving(true)
     const finalTitle = updatedData?.title || editTitle
-    const finalContent = updatedData?.content || editContent
+    const finalContent = processHtmlContent(updatedData?.content || editContent)
     const finalSiteTitle = updatedData?.siteTitle || editSiteTitle
     const finalLogo = updatedData?.siteLogo || editLogo
 
@@ -1391,17 +1453,7 @@ function App() {
 
     // Helper untuk mengubah Google Drive link di HTML content menjadi ImageKit CDN proxy
     const renderContentHtml = (htmlContent: string) => {
-      let content = htmlContent || '';
-      content = content.replace(/&nbsp;/g, ' ');
-      
-      const endpoint = import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined;
-      if (endpoint) {
-        // Ganti semua https://lh3.googleusercontent.com/d/FILE_ID menjadi ImageKit CDN proxy
-        const regex = /https:\/\/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/g;
-        content = content.replace(regex, (match, fileId) => {
-          return `${endpoint}/d/${fileId}?tr=w-800,q-80`;
-        });
-      }
+      const content = processHtmlContent(htmlContent);
       return { __html: content };
     };
 
@@ -1415,7 +1467,7 @@ function App() {
         ) : (
           <AdminDashboard
             initialTitle={editTitle || ''} initialContent={editContent || ''} initialSiteTitle={editSiteTitle || ''} initialSiteLogo={editLogo || ''}
-            onSave={(data: any) => { setEditTitle(data.title || ''); setEditContent(data.content || ''); setEditSiteTitle(data.siteTitle || ''); setEditLogo(data.siteLogo || ''); }}
+            onSave={(data: any) => { setEditTitle(data.title || ''); setEditContent(processHtmlContent(data.content || '')); setEditSiteTitle(data.siteTitle || ''); setEditLogo(data.siteLogo || ''); }}
             onPublish={(data: any) => saveChanges(data)} isSaving={isSaving}
             scriptUrl={SCRIPT_URL}
           />

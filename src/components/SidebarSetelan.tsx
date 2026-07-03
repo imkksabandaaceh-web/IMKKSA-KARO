@@ -4,12 +4,6 @@ import { compressImage } from '../utils/imageUtils';
 interface SidebarSetelanProps {
   label: string;
   setLabel: (val: string) => void;
-  jadwal: string;
-  setJadwal: (val: string) => void;
-  tautan: string;
-  setTautan: (val: string) => void;
-  komentar: boolean;
-  setKomentar: (val: boolean) => void;
   siteTitle: string;
   setSiteTitle: (val: string) => void;
   siteLogo: string;
@@ -17,8 +11,7 @@ interface SidebarSetelanProps {
 }
 
 const SidebarSetelan: React.FC<SidebarSetelanProps> = ({
-  label, setLabel, jadwal, setJadwal, tautan, setTautan, komentar, setKomentar,
-  siteTitle, setSiteTitle, siteLogo, setSiteLogo,
+  label, setLabel, siteTitle, setSiteTitle, siteLogo, setSiteLogo,
 }) => {
   const [activeSection, setActiveSection] = useState<string | null>('label');
 
@@ -94,60 +87,6 @@ const SidebarSetelan: React.FC<SidebarSetelanProps> = ({
               onChange={(e) => setLabel(e.target.value)}
               className="sidebar-input"
             />
-          </div>
-        )}
-      </div>
-
-      <div className="sidebar-section">
-        <div className="sidebar-header" onClick={() => toggleSection('jadwal')}>
-          <span>Jadwal</span>
-          <span className="arrow">{activeSection === 'jadwal' ? '▾' : '▸'}</span>
-        </div>
-        {activeSection === 'jadwal' && (
-          <div className="sidebar-content">
-            <input
-              type="datetime-local"
-              value={jadwal}
-              onChange={(e) => setJadwal(e.target.value)}
-              className="sidebar-input"
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="sidebar-section">
-        <div className="sidebar-header" onClick={() => toggleSection('tautan')}>
-          <span>Tautan</span>
-          <span className="arrow">{activeSection === 'tautan' ? '▾' : '▸'}</span>
-        </div>
-        {activeSection === 'tautan' && (
-          <div className="sidebar-content">
-            <input
-              type="text"
-              placeholder="Permalink khusus"
-              value={tautan}
-              onChange={(e) => setTautan(e.target.value)}
-              className="sidebar-input"
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="sidebar-section">
-        <div className="sidebar-header" onClick={() => toggleSection('opsi')}>
-          <span>Opsi Komentar</span>
-          <span className="arrow">{activeSection === 'opsi' ? '▾' : '▸'}</span>
-        </div>
-        {activeSection === 'opsi' && (
-          <div className="sidebar-content">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={komentar}
-                onChange={(e) => setKomentar(e.target.checked)}
-              />
-              Izinkan komentar
-            </label>
           </div>
         )}
       </div>

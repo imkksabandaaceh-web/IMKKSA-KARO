@@ -27,9 +27,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Sidebar states
   const [label, setLabel] = useState('');
-  const [jadwal, setJadwal] = useState('');
-  const [tautan, setTautan] = useState('');
-  const [komentar, setKomentar] = useState(true);
 
   useEffect(() => {
     setTitle(initialTitle);
@@ -39,11 +36,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [initialTitle, initialContent, initialSiteTitle, initialSiteLogo]);
 
   const handlePublish = () => {
-    onPublish({ title, content, label, jadwal, tautan, komentar, siteTitle, siteLogo });
+    onPublish({ title, content, label, siteTitle, siteLogo });
   };
 
   const handlePreview = () => {
-    onSave({ title, content, label, jadwal, tautan, komentar, siteTitle, siteLogo });
+    onSave({ title, content, label, siteTitle, siteLogo });
   };
 
   return (
@@ -66,9 +63,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className={`sidebar-wrapper ${isSidebarOpen ? 'open' : 'closed'}`}>
             <SidebarSetelan
               label={label} setLabel={setLabel}
-              jadwal={jadwal} setJadwal={setJadwal}
-              tautan={tautan} setTautan={setTautan}
-              komentar={komentar} setKomentar={setKomentar}
               siteTitle={siteTitle} setSiteTitle={setSiteTitle}
               siteLogo={siteLogo} setSiteLogo={setSiteLogo}
             />
