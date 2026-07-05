@@ -78,6 +78,17 @@ const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
   return url;
 };
 
+const formatDateDevice = (dateStr: string | undefined | null): string => {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 const processHtmlContent = (htmlContent: string): string => {
   let content = htmlContent || '';
   content = content.replace(/&nbsp;/g, ' ');
@@ -212,6 +223,8 @@ interface UmatRecord {
   photo: string;
   kk: string;
   isPending?: boolean;
+  tempatLahir?: string;
+  tanggalLahir?: string;
 }
 
 interface PengurusRecord {
@@ -324,14 +337,14 @@ function App() {
   const [userSearchQuery, setUserSearchQuery] = useState('')
   const [adminSearch, setAdminSearch] = useState('')
   const [umatForm, setUmatForm] = useState<Omit<UmatRecord, 'id' | 'isPending'>>({
-    nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: ''
+    nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: ''
   })
   const [editingId, setEditingId] = useState<string | null>(null)
 
   // Non-Admin data anggota flow
   const [showUserForm, setShowUserForm] = useState(false)
   const [userUmatForm, setUserUmatForm] = useState<Omit<UmatRecord, 'id' | 'isPending'>>({
-    nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: ''
+    nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: ''
   })
   const [userSubmitMessage, setUserSubmitMessage] = useState<string | null>(null)
   const [isSubmittingUserForm, setIsSubmittingUserForm] = useState(false)
@@ -581,7 +594,7 @@ function App() {
       console.error("Gagal sinkron data anggota:", error)
       alert('Gagal menyinkronkan data ke Google Drive.')
     }
-    setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' })
+    setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' })
     setEditingId(null)
     setAdminSearch('')
   }
@@ -606,7 +619,7 @@ function App() {
       }
 
       if (editingId === id) {
-        setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
+        setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
         setEditingId(null);
       }
     }
@@ -688,7 +701,7 @@ function App() {
     } finally {
       setIsSubmittingUserForm(false);
       setShowUserForm(false);
-      setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
+      setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
     }
   }
 
@@ -1135,6 +1148,14 @@ function App() {
                   <label>No. HP / WA:</label>
                   <input type="text" value={umatForm.noHp} onChange={e => setUmatForm({ ...umatForm, noHp: e.target.value })} />
                 </div>
+                <div className="form-group">
+                  <label>Tempat Lahir:</label>
+                  <input type="text" value={umatForm.tempatLahir || ''} onChange={e => setUmatForm({ ...umatForm, tempatLahir: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Tanggal Lahir:</label>
+                  <input type="date" value={umatForm.tanggalLahir || ''} onChange={e => setUmatForm({ ...umatForm, tanggalLahir: e.target.value })} />
+                </div>
                 <div className="form-group full-width">
                   <label>Alamat:</label>
                   <textarea value={umatForm.alamat} onChange={e => setUmatForm({ ...umatForm, alamat: e.target.value })} />
@@ -1169,7 +1190,7 @@ function App() {
                     <button 
                       className="btn-delete" 
                       onClick={() => {
-                        setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' });
+                        setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
                         setEditingId(null);
                       }}
                       style={{ background: '#757575' }}
@@ -1210,7 +1231,7 @@ function App() {
                         <td>
                           <div className="table-actions">
                             <button className="btn-edit-small" onClick={() => setSelectedUmat(u)} style={{ background: '#e3f2fd', color: '#0d47a1', border: '1px solid #bbdefb' }}>Detail</button>
-                            <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+                            <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
                             <button className="btn-delete-small" onClick={() => handleDeleteUmat(u.id, u.nama)}>Hapus</button>
                           </div>
                         </td>
@@ -1245,7 +1266,7 @@ function App() {
                           <td>
                             <div className="table-actions">
                               <button className="btn-save" style={{ padding: '6px 12px', fontSize: '0.75rem', textTransform: 'none' }} onClick={() => handleApproveUmat(u)}>Approve</button>
-                              <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status || 'Anggota', nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+                              <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status || 'Anggota', nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
                               <button className="btn-delete-small" onClick={() => handleRejectUmat(u.id)}>Tolak</button>
                             </div>
                           </td>
@@ -1340,7 +1361,7 @@ function App() {
                   <button 
                     className="btn-save" 
                     onClick={() => { 
-                      setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '' }); 
+                      setUserUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' }); 
                       setShowUserForm(true); 
                       setUserSubmitMessage(null); 
                     }}
@@ -1390,6 +1411,23 @@ function App() {
                         value={userUmatForm.noHp} 
                         onChange={e => setUserUmatForm({ ...userUmatForm, noHp: e.target.value })} 
                         placeholder="Contoh: 081234567890"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Tempat Lahir (Opsional):</label>
+                      <input 
+                        type="text" 
+                        value={userUmatForm.tempatLahir || ''} 
+                        onChange={e => setUserUmatForm({ ...userUmatForm, tempatLahir: e.target.value })} 
+                        placeholder="Kota atau Kabupaten tempat Anda lahir"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Tanggal Lahir (Opsional):</label>
+                      <input 
+                        type="date" 
+                        value={userUmatForm.tanggalLahir || ''} 
+                        onChange={e => setUserUmatForm({ ...userUmatForm, tanggalLahir: e.target.value })} 
                       />
                     </div>
                     <div className="form-group">
@@ -1554,6 +1592,14 @@ function App() {
                     <tr>
                       <td className="label-cell">Nama Lengkap</td>
                       <td className="value-cell">: {selectedUmat.nama}</td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">Tempat Lahir</td>
+                      <td className="value-cell">: {selectedUmat.tempatLahir || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="label-cell">Tanggal Lahir</td>
+                      <td className="value-cell">: {selectedUmat.tanggalLahir ? formatDateDevice(selectedUmat.tanggalLahir) : '-'}</td>
                     </tr>
                     <tr>
                       <td className="label-cell">NIK / No. KTP</td>
