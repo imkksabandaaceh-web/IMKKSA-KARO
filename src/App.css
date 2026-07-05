@@ -1119,7 +1119,7 @@ button {
 @media print {
   @page {
     size: 21cm 33cm;
-    margin: 1.5cm;
+    margin: 1.2cm;
   }
   body * {
     visibility: hidden;
@@ -1146,8 +1146,82 @@ button {
   .modal-header-btn, .modal-footer-actions {
     display: none !important;
   }
+  
+  /* Compact layout for single page Folio printing */
   .form-print-area {
-    padding: 0;
+    padding: 0 !important;
+    line-height: 1.15 !important;
+  }
+  .kop-surat {
+    padding-bottom: 5px !important;
+    margin-bottom: 10px !important;
+  }
+  .kop-logo {
+    width: 55px !important;
+    height: 55px !important;
+    margin-right: 10px !important;
+  }
+  .kop-text h2 {
+    font-size: 1.05rem !important;
+    margin-bottom: 2px !important;
+  }
+  .kop-text p {
+    font-size: 0.72rem !important;
+    line-height: 1.2 !important;
+  }
+  .form-title {
+    font-size: 1.1rem !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 4px !important;
+  }
+  .form-details-grid {
+    margin-bottom: 10px !important;
+    gap: 15px !important;
+  }
+  .details-table td {
+    padding: 4px 6px !important;
+    font-size: 0.82rem !important;
+  }
+  .details-photo-box {
+    padding: 6px !important;
+  }
+  .details-photo-box img {
+    width: 85px !important;
+    height: 110px !important;
+  }
+  .details-photo-box span {
+    font-size: 0.65rem !important;
+    margin-top: 4px !important;
+  }
+  .form-attachments {
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+  }
+  .form-attachments h4 {
+    font-size: 0.82rem !important;
+    margin-bottom: 4px !important;
+  }
+  .attachment-kk {
+    max-height: 150px !important;
+    margin-top: 4px !important;
+  }
+  .kk-locked-box {
+    height: 90px !important;
+    margin-top: 4px !important;
+  }
+  .kk-locked-icon {
+    font-size: 1.3rem !important;
+    margin-bottom: 2px !important;
+  }
+  .kk-locked-text {
+    font-size: 0.72rem !important;
+  }
+  .signature-section {
+    margin-top: 12px !important;
+    font-size: 0.8rem !important;
+  }
+  .signature-space {
+    height: 40px !important;
   }
 }
 
