@@ -838,7 +838,6 @@ button {
   border: 1px solid #ffeeba;
 }
 
-/* Modal styling for Formulir Pendaftaran */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -848,9 +847,10 @@ button {
   background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  overflow-y: auto;
   z-index: 2000;
-  padding: 20px;
+  padding: 40px 20px;
   backdrop-filter: blur(4px);
 }
 
