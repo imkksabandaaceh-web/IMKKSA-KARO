@@ -243,7 +243,7 @@ interface FullContent {
   galeriAlbum: GaleriAlbum[];
 }
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyynP-phPebHRzTIYciWVhTql8z-modG3AMfZLO15n8uipSsN5WCKswpptms2eU0nT6gQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyaEatvxMhJfwQROL-esMFIQJZ9jAEFf1P7ixTlN0wYgdpL3ow27JmSd6E1dk892B2DYw/exec';
 
 const DEFAULT_CONTENT: FullContent = {
   settings: {
