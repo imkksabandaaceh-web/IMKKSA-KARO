@@ -1576,7 +1576,7 @@ function App() {
               <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" className="kop-logo" />
               <div className="kop-text">
                 <h2>IKATAN MASYARAKAT KARO KRISTEN SADA ARIH BANDA ACEH SEKITAR</h2>
-                <p>Sekretariat: Banda Aceh, Prov. Aceh | Email: imkksa2006@gmail.com</p>
+                <p>Sekretariat: Banda Aceh, Prov. Aceh | Email: imkksabandaaceh@gmail.com</p>
                 <p>Website: https://www.imkksa-bandaaceh.site/ | Didirikan: Tahun 2006</p>
               </div>
             </div>
