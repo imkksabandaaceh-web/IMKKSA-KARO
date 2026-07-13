@@ -1,8 +1,8 @@
 # Backup Percakapan & Status Proyek (IMKKSA-MIGRATION-8AFB1C)
 
-**Tanggal Pembaruan:** Jumat, 10 Juli 2026
+**Tanggal Pembaruan:** Senin, 13 Juli 2026
 **Kode Referensi:** `IMKKSA-MIGRATION-8AFB1C`
-**Conversation ID:** `b9af042a-bb97-4a37-86c5-4009dc63655c` (Session Baru)
+**Conversation ID:** `edeb2809-f9a2-4b04-a8e9-748fa18cca16`
 
 ---
 
@@ -34,6 +34,20 @@
 * **Rencana Solusi:**
   * Memanfaatkan cache lokal (`localStorage`) dari browser Chrome milik pengguna yang menyimpan key `imkksaSiteContent`.
   * Menyalin data JSON tersebut dari Console Developer Tools dan menempelkannya ke chat agar asisten dapat mempostingnya ke Apps Script baru untuk pemulihan database.
+
+---
+
+## 3. Pembaruan Fitur & Tampilan (13 Juli 2026)
+* **Presisi Foto Pengurus (Penyelarasan Wajah):**
+  * Foto pengurus pada menu *Struktur Pengurus* kini dipotong secara otomatis menggunakan deteksi wajah (*face detection*) server ImageKit dengan parameter `tr=w-400,h-400,fo-face`.
+  * Mengatasi masalah wajah terpotong/tidak presisi pada bingkai bulatan di browser pengguna non-login maupun admin login.
+* **Keamanan NIK / KTP Umat:**
+  * Menambahkan sensor NIK/KTP untuk pengguna non-login di modal Formulir Pendaftaran Anggota.
+  * 3 digit terakhir dari NIK akan diubah menjadi `xxx` (misal: `1234567890123xxx`).
+  * Admin yang telah login tetap dapat melihat NIK secara penuh tanpa sensor.
+* **Sinkronisasi & Rilis:**
+  * Aplikasi telah dibangun ulang (`npm run build`) dan didorong ke cabang master GitHub (`git push origin master`).
+  * Vercel secara otomatis melakukan auto-deploy dari perubahan terbaru ini.
 
 ---
 *Berikan kode referensi **`IMKKSA-MIGRATION-8AFB1C`** kepada asisten baru untuk meminta mereka langsung membaca file ini guna memahami konteks pengerjaan.*
