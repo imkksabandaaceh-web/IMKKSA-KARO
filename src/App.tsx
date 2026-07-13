@@ -120,9 +120,11 @@ const processHtmlContent = (htmlContent: string): string => {
         }
       }
 
-      const isImage = /\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(href) || 
-                      fileId !== '' ||
-                      (endpoint && href.includes(endpoint.replace('https://', '')));
+      // Deteksi jika link ini mengarah ke file dokumen/non-gambar
+      const isDocument = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|txt|csv)(\?.*)?$/i.test(href) ||
+                         /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|txt|csv)/i.test(a.textContent || '');
+
+      const isImage = (/\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(href) || fileId !== '') && !isDocument;
 
       if (isImage) {
         if (fileId && endpoint) {
@@ -135,6 +137,10 @@ const processHtmlContent = (htmlContent: string): string => {
         img.setAttribute('style', 'max-width: 100%; height: auto; display: block; margin: 10px 0; border-radius: 8px;');
         a.parentNode?.replaceChild(img, a);
       } else {
+        // Jika dokumen dan merupakan link Google Drive, ubah href menjadi ImageKit Proxy
+        if (fileId && endpoint) {
+          a.setAttribute('href', `${endpoint}/d/${fileId}`);
+        }
         a.setAttribute('target', '_blank');
         a.setAttribute('rel', 'noopener noreferrer');
       }
