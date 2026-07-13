@@ -41,13 +41,15 @@ const compressImage = (base64: string, maxWidth: number, quality: number): Promi
   });
 };
 
-const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
+const toImageKitUrl = (url: string | undefined | null, width = 800, cropFace = false): string => {
   if (!url) return '';
   const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
   
+  const tr = cropFace ? `tr=w-${width},h-${width},fo-face` : `tr=w-${width},q-80`;
+
   if (url.includes('ik.imagekit.io')) {
     const cleanUrl = url.split('?')[0];
-    return `${cleanUrl}?tr=w-${width},q-80`;
+    return `${cleanUrl}?${tr}`;
   }
 
   let fileId = '';
@@ -67,12 +69,12 @@ const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
   }
 
   if (fileId && endpoint) {
-    return `${endpoint}/d/${fileId}?tr=w-${width},q-80`;
+    return `${endpoint}/d/${fileId}?${tr}`;
   }
 
   if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
     const cleanUrl = url.split('?')[0];
-    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?tr=w-${width},q-80`;
+    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?${tr}`;
   }
 
   return url;
@@ -1506,7 +1508,7 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400)} alt={p.nama} className="pengurus-photo" />}
+                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" />}
                 <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}
@@ -1609,7 +1611,9 @@ function App() {
                     </tr>
                     <tr>
                       <td className="label-cell">NIK / No. KTP</td>
-                      <td className="value-cell">: {selectedUmat.nik || '-'}</td>
+                      <td className="value-cell">
+                        : {selectedUmat.nik ? (isLoggedIn ? selectedUmat.nik : (selectedUmat.nik.length <= 3 ? 'xxx' : selectedUmat.nik.substring(0, selectedUmat.nik.length - 3) + 'xxx')) : '-'}
+                      </td>
                     </tr>
                     <tr>
                       <td className="label-cell">No. HP / WA</td>

@@ -110,7 +110,7 @@ export default function PengurusAdmin({
           >
 
             <img
-              src={toImageKitUrl(p.photo, 400)}
+              src={toImageKitUrl(p.photo, 400, true)}
               alt={p.nama}
               className="pengurus-photo"
             />

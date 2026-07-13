@@ -21,7 +21,7 @@ export default function Pengurus({ data }: Props) {
         {data.map((p) => (
           <div className="pengurus-card" key={p.id}>
             <img
-              src={toImageKitUrl(p.photo || '/LOGO_KARO.jpg', 400)}
+              src={toImageKitUrl(p.photo || '/LOGO_KARO.jpg', 400, true)}
               alt={p.nama}
               className="pengurus-photo"
             />

@@ -52,13 +52,15 @@ export const compressImage = (base64Str: string, maxWidth = 800, quality = 0.7):
  * Konversi URL Google Drive/lh3.googleusercontent.com -> ImageKit proxy.
  * Jika ImageKit belum dikonfigurasi, gunakan format asli.
  */
-export const toImageKitUrl = (url: string | undefined | null, width = 800): string => {
+export const toImageKitUrl = (url: string | undefined | null, width = 800, cropFace = false): string => {
   if (!url) return '';
   const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
   
+  const tr = cropFace ? `tr=w-${width},h-${width},fo-face` : `tr=w-${width},q-80`;
+
   if (url.includes('ik.imagekit.io')) {
     const cleanUrl = url.split('?')[0];
-    return `${cleanUrl}?tr=w-${width},q-80`;
+    return `${cleanUrl}?${tr}`;
   }
 
   let fileId = '';
@@ -78,12 +80,12 @@ export const toImageKitUrl = (url: string | undefined | null, width = 800): stri
   }
 
   if (fileId && endpoint) {
-    return `${endpoint}/d/${fileId}?tr=w-${width},q-80`;
+    return `${endpoint}/d/${fileId}?${tr}`;
   }
 
   if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
     const cleanUrl = url.split('?')[0];
-    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?tr=w-${width},q-80`;
+    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?${tr}`;
   }
 
   return url;
