@@ -235,6 +235,25 @@ interface UmatRecord {
   tanggalLahir?: string;
 }
 
+type UmatSortOption = 'nama-az' | 'nama-za' | 'tanggal-terbaru' | 'tanggal-terlama';
+
+// id anggota dibuat dari Date.now() (atau "pending_"+Date.now() untuk yang masih pending),
+// jadi bisa dipakai juga sebagai penanda urutan waktu input tanpa perlu field tambahan.
+const getUmatTimestamp = (u: UmatRecord): number => {
+  const raw = u.id.replace('pending_', '');
+  const ts = parseInt(raw, 10);
+  return isNaN(ts) ? 0 : ts;
+};
+
+const sortUmatList = (list: UmatRecord[], sortBy: UmatSortOption): UmatRecord[] => {
+  const sorted = [...list];
+  if (sortBy === 'nama-az') sorted.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  else if (sortBy === 'nama-za') sorted.sort((a, b) => b.nama.localeCompare(a.nama, 'id'));
+  else if (sortBy === 'tanggal-terbaru') sorted.sort((a, b) => getUmatTimestamp(b) - getUmatTimestamp(a));
+  else if (sortBy === 'tanggal-terlama') sorted.sort((a, b) => getUmatTimestamp(a) - getUmatTimestamp(b));
+  return sorted;
+};
+
 interface PengurusRecord {
   id: string
   jabatan: string
@@ -351,6 +370,11 @@ function App() {
   // Mode input KK khusus form admin: 'upload' file baru, 'link' tempel link manual,
   // 'sama' pakai KK milik anggota lain yang sudah ada (mis. kepala keluarga)
   const [kkMode, setKkMode] = useState<'upload' | 'link' | 'sama'>('upload')
+  // Urutan tampil tabel "Daftar Anggota Resmi" di admin
+  const [adminSortBy, setAdminSortBy] = useState<UmatSortOption>('nama-az')
+  // Tampilan publik (non-login): daftar baru muncul setelah cari atau klik "Tampilkan Semua"
+  const [userShowAll, setUserShowAll] = useState(false)
+  const [userSortBy, setUserSortBy] = useState<UmatSortOption>('nama-az')
 
   // Non-Admin data anggota flow
   const [showUserForm, setShowUserForm] = useState(false)
@@ -1125,13 +1149,21 @@ function App() {
   const renderDataAnggota = () => {
     const pendingUmat = siteContent.umat.filter(u => u.isPending);
     const approvedUmat = siteContent.umat.filter(u => !u.isPending);
-    const filteredAdminUmat = adminSearch
-      ? approvedUmat.filter(u => u.nama.toLowerCase().includes(adminSearch.toLowerCase()))
-      : approvedUmat;
-
-    const filteredUserUmat = approvedUmat.filter(u =>
-      u.nama.toLowerCase().includes(userSearchQuery.toLowerCase())
+    const filteredAdminUmat = sortUmatList(
+      adminSearch
+        ? approvedUmat.filter(u => u.nama.toLowerCase().includes(adminSearch.toLowerCase()))
+        : approvedUmat,
+      adminSortBy
     );
+
+    // Tabel publik sengaja kosong sebelum user mencari atau klik "Tampilkan Semua"
+    const userHasQueried = !!userSearchQuery || userShowAll;
+    const filteredUserUmat = userHasQueried
+      ? sortUmatList(
+          approvedUmat.filter(u => u.nama.toLowerCase().includes(userSearchQuery.toLowerCase())),
+          userSortBy
+        )
+      : [];
 
     return (
       <div className="page-content">
@@ -1273,7 +1305,15 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <h3>Daftar Anggota Resmi ({approvedUmat.length})</h3>
               </div>
-              <input type="text" placeholder="Cari Anggota Resmi..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '15px' }} />
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px' }}>
+                <input type="text" placeholder="Cari Anggota Resmi..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                <select value={adminSortBy} onChange={e => setAdminSortBy(e.target.value as UmatSortOption)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}>
+                  <option value="nama-az">Nama (A-Z)</option>
+                  <option value="nama-za">Nama (Z-A)</option>
+                  <option value="tanggal-terbaru">Tanggal Input (Terbaru)</option>
+                  <option value="tanggal-terlama">Tanggal Input (Terlama)</option>
+                </select>
+              </div>
               <div className="table-responsive">
                 <table className="umat-table admin-table">
                   <thead>
@@ -1344,20 +1384,35 @@ function App() {
           </div>
         ) : (
           <div className="user-data-section">
-            <div className="user-search-container" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <div className="user-search-container" style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
               <input 
                 type="text" 
                 placeholder="Cari Nama Anggota..." 
                 value={userSearch} 
                 onChange={e => setUserSearch(e.target.value)} 
                 onKeyDown={e => { if (e.key === 'Enter') handleUserSearch(); }}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                style={{ flex: 1, minWidth: '180px', padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
               />
               <button className="btn-save" onClick={handleUserSearch} style={{ padding: '0 30px' }}>CARI</button>
-              {userSearchQuery && (
+              <button
+                className="btn-save"
+                onClick={() => { setUserSearch(''); setUserSearchQuery(''); setUserShowAll(true); }}
+                style={{ padding: '0 20px', background: '#546e7a' }}
+              >
+                TAMPILKAN SEMUA
+              </button>
+              {userHasQueried && (
+                <select value={userSortBy} onChange={e => setUserSortBy(e.target.value as UmatSortOption)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}>
+                  <option value="nama-az">Nama (A-Z)</option>
+                  <option value="nama-za">Nama (Z-A)</option>
+                  <option value="tanggal-terbaru">Tanggal Input (Terbaru)</option>
+                  <option value="tanggal-terlama">Tanggal Input (Terlama)</option>
+                </select>
+              )}
+              {userHasQueried && (
                 <button 
                   className="btn-edit-small" 
-                  onClick={() => { setUserSearch(''); setUserSearchQuery(''); }}
+                  onClick={() => { setUserSearch(''); setUserSearchQuery(''); setUserShowAll(false); }}
                   style={{ padding: '10px 15px', textTransform: 'none', letterSpacing: 0, fontWeight: 'normal' }}
                 >
                   Reset
@@ -1409,7 +1464,7 @@ function App() {
                     ) : (
                       <tr>
                         <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
-                          Data Anggota Tidak Ditemukan
+                          {userHasQueried ? 'Data Anggota Tidak Ditemukan' : 'Klik "TAMPILKAN SEMUA" atau cari nama untuk melihat daftar anggota.'}
                         </td>
                       </tr>
                     )}
@@ -1417,7 +1472,7 @@ function App() {
                 </table>
               </div>
 
-              {filteredUserUmat.length === 0 && (
+              {userHasQueried && filteredUserUmat.length === 0 && (
                 <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
                   <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '15px' }}>
                     Nama Anda belum terdaftar? Silakan isi data secara mandiri untuk mendaftar.
