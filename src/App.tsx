@@ -1629,7 +1629,17 @@ function App() {
     } else {
       return (
         <div className="page-content">
-          <h2>Kelola Pengurus</h2>
+          <h2>Daftar Pengurus</h2>
+          <div className="pengurus-grid">
+            {pengurusList.map(p => (
+              <div key={p.id} className="pengurus-card">
+                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" />}
+                <h3>{p.jabatan}</h3><p>{p.nama}</p>
+              </div>
+            ))}
+          </div>
+
+          <h2 style={{ marginTop: '40px' }}>Kelola Pengurus</h2>
           <div className="form-section">
             <label>Jabatan</label>
             <select value={pengurusForm.jabatan} onChange={e => setPengurusForm({ ...pengurusForm, jabatan: e.target.value })}>
@@ -1637,10 +1647,14 @@ function App() {
             </select>
             <label>Nama</label><input type="text" value={pengurusForm.nama} onChange={e => setPengurusForm({ ...pengurusForm, nama: e.target.value })} />
             <label>Foto</label><input type="file" accept="image/*" onChange={handlePengurusPhoto} />
+            {pengurusForm.photo && (
+              <div className="preview-container">
+                <img src={toImageKitUrl(pengurusForm.photo, 200, true)} alt="Preview Foto" className="file-preview-img" />
+                <button type="button" className="btn-remove-file" onClick={() => setPengurusForm({ ...pengurusForm, photo: '' })}>Hapus Foto</button>
+              </div>
+            )}
             <button className="btn-save" onClick={handleSavePengurus}>Simpan Pengurus</button>
           </div>
-          <h3>Data Pengurus Saat Ini</h3>
-          <ul>{pengurusList.map(p => <li key={p.id}>{p.jabatan}: {p.nama}</li>)}</ul>
         </div>
       )
     }
