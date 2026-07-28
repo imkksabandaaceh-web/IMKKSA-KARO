@@ -66,7 +66,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
           />
         </div>
         
-        <div className="password-input-wrapper" style={{ position: 'relative' }}>
+        <div className="form-group password-input-wrapper" style={{ position: 'relative' }}>
           <input 
             type={showPassword ? "text" : "password"} 
             placeholder="Password" 
@@ -75,7 +75,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             disabled={isLoading}
             required 
             autoComplete="current-password"
-            style={{ width: '100%', paddingRight: '45px' }}
+            style={{ width: '100%', paddingRight: '45px', boxSizing: 'border-box' }}
           />
           <button 
             type="button" 
