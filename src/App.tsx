@@ -348,6 +348,9 @@ function App() {
     nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: ''
   })
   const [editingId, setEditingId] = useState<string | null>(null)
+  // Mode input KK khusus form admin: 'upload' file baru, 'link' tempel link manual,
+  // 'sama' pakai KK milik anggota lain yang sudah ada (mis. kepala keluarga)
+  const [kkMode, setKkMode] = useState<'upload' | 'link' | 'sama'>('upload')
 
   // Non-Admin data anggota flow
   const [showUserForm, setShowUserForm] = useState(false)
@@ -604,6 +607,7 @@ function App() {
     }
     setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' })
     setEditingId(null)
+    setKkMode('upload')
     setAdminSearch('')
   }
 
@@ -629,6 +633,7 @@ function App() {
       if (editingId === id) {
         setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
         setEditingId(null);
+        setKkMode('upload');
       }
     }
   }
@@ -1179,11 +1184,61 @@ function App() {
                   )}
                 </div>
                 <div className="form-group">
-                  <label>Upload KK (Kartu Keluarga - Opsional, Maksimal 5 MB):</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'kk', true)} />
+                  <label>Kartu Keluarga (KK - Opsional, Maksimal 5 MB):</label>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    <label style={{ fontWeight: 400, display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                      <input type="radio" name="kkMode" checked={kkMode === 'upload'} onChange={() => setKkMode('upload')} />
+                      Upload File
+                    </label>
+                    <label style={{ fontWeight: 400, display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                      <input type="radio" name="kkMode" checked={kkMode === 'link'} onChange={() => setKkMode('link')} />
+                      Link Manual
+                    </label>
+                    <label style={{ fontWeight: 400, display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                      <input type="radio" name="kkMode" checked={kkMode === 'sama'} onChange={() => setKkMode('sama')} />
+                      Sama dengan Kepala Keluarga
+                    </label>
+                  </div>
+
+                  {kkMode === 'upload' && (
+                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'kk', true)} />
+                  )}
+
+                  {kkMode === 'link' && (
+                    <input
+                      type="text"
+                      placeholder="Tempel link KK di sini (mis. link Google Drive)"
+                      value={umatForm.kk}
+                      onChange={(e) => setUmatForm({ ...umatForm, kk: e.target.value })}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                    />
+                  )}
+
+                  {kkMode === 'sama' && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const chosen = approvedUmat.find(u => u.id === e.target.value);
+                        if (chosen && chosen.kk) {
+                          setUmatForm({ ...umatForm, kk: chosen.kk });
+                        }
+                      }}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                    >
+                      <option value="">-- Pilih Kepala Keluarga --</option>
+                      {approvedUmat.filter(u => u.kk).map(u => (
+                        <option key={u.id} value={u.id}>{u.nama}</option>
+                      ))}
+                    </select>
+                  )}
+
                   {umatForm.kk && (
                     <div className="preview-container">
-                      <img src={toImageKitUrl(umatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
+                      {kkMode === 'link' ? (
+                        <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', color: '#555' }}>Link tersimpan: {umatForm.kk}</p>
+                      ) : (
+                        <img src={toImageKitUrl(umatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
+                      )}
                       <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, kk: '' })}>Hapus KK</button>
                     </div>
                   )}
@@ -1200,6 +1255,7 @@ function App() {
                       onClick={() => {
                         setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
                         setEditingId(null);
+                        setKkMode('upload');
                       }}
                       style={{ background: '#757575' }}
                     >
@@ -1239,7 +1295,7 @@ function App() {
                         <td>
                           <div className="table-actions">
                             <button className="btn-edit-small" onClick={() => setSelectedUmat(u)} style={{ background: '#e3f2fd', color: '#0d47a1', border: '1px solid #bbdefb' }}>Detail</button>
-                            <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+                            <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status, nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); setKkMode('upload'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
                             <button className="btn-delete-small" onClick={() => handleDeleteUmat(u.id, u.nama)}>Hapus</button>
                           </div>
                         </td>
@@ -1274,7 +1330,7 @@ function App() {
                           <td>
                             <div className="table-actions">
                               <button className="btn-save" style={{ padding: '6px 12px', fontSize: '0.75rem', textTransform: 'none' }} onClick={() => handleApproveUmat(u)}>Approve</button>
-                              <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status || 'Anggota', nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+                              <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status || 'Anggota', nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); setKkMode('upload'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
                               <button className="btn-delete-small" onClick={() => handleRejectUmat(u.id)}>Tolak</button>
                             </div>
                           </td>
