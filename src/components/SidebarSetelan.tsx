@@ -30,8 +30,13 @@ const SidebarSetelan: React.FC<SidebarSetelanProps> = ({
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
-        const compressed = await compressImage(base64, 400, 0.7);
-        setSiteLogo(compressed);
+        if (file.type === 'image/gif') {
+          // GIF tidak diproses lewat canvas, supaya animasinya tidak hilang
+          setSiteLogo(base64);
+        } else {
+          const compressed = await compressImage(base64, 400, 0.7);
+          setSiteLogo(compressed);
+        }
       };
       reader.readAsDataURL(file);
     }

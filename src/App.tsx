@@ -552,7 +552,34 @@ function App() {
     const finalTitle = updatedData?.title || editTitle
     const finalContent = processHtmlContent(updatedData?.content || editContent)
     const finalSiteTitle = updatedData?.siteTitle || editSiteTitle
-    const finalLogo = updatedData?.siteLogo || editLogo
+    let finalLogo = updatedData?.siteLogo || editLogo
+
+    // Kalau logo masih berupa base64 mentah (baru diupload, belum sempat dipindah),
+    // upload dulu ke Google Drive supaya yang disimpan ke Sheets cuma link pendek,
+    // bukan teks base64 yang bisa melebihi batas 50.000 karakter per sel Google Sheets.
+    if (finalLogo && finalLogo.startsWith('data:image')) {
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'uploadImage', data: { base64: finalLogo } })
+        });
+        const result = await res.json();
+        if (result.success && result.url) {
+          finalLogo = result.url;
+          setEditLogo(result.url);
+        } else {
+          console.error('Gagal upload logo ke Google Drive:', result.error);
+          alert('Gagal mengupload logo ke Google Drive. Perubahan lain tetap disimpan, tapi logo tidak berubah.');
+          finalLogo = siteContent.settings.logo; // fallback ke logo lama, jangan kirim base64 mentah
+        }
+      } catch (err) {
+        console.error('Error upload logo:', err);
+        alert('Gagal mengupload logo (koneksi bermasalah). Perubahan lain tetap disimpan, tapi logo tidak berubah.');
+        finalLogo = siteContent.settings.logo;
+      }
+    }
 
     const newContent = {
       ...siteContent,
@@ -1833,7 +1860,7 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <div className="logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" /></div>
+        <div className="logo-container"><img src={siteContent.settings.logo || "/LOGO_KARO.jpg"} alt="Logo IMKKSA" /></div>
         <h1>{siteContent.settings.title}</h1>
       </header>
       <nav className="navbar">
