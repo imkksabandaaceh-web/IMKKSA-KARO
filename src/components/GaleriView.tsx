@@ -21,7 +21,7 @@
 // Daftar file dibaca dari Google Drive JSON feed (public, tanpa API key).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Konfigurasi ──────────────────────────────────────────────────────────────
 const IMAGEKIT_ENDPOINT = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
@@ -225,6 +225,13 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
   const [state, setState] = useState<AlbumPhotosState>({ status: 'idle', files: [] });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // ── State & ref untuk fitur "1 baris + Lihat Semua" ─────────────────────
+  const [expanded, setExpanded] = useState(false);
+  const [rowHeight, setRowHeight] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const gridInnerRef = useRef<HTMLDivElement>(null);
+  const firstItemRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setState({ status: 'loading', files: [] });
     fetchFolderFiles(folderId, scriptUrl)
@@ -234,6 +241,23 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
         setState({ status: 'error', files: [], error: err.message });
       });
   }, [folderId, scriptUrl]);
+
+  // Ukur tinggi 1 baris foto & bandingkan dengan tinggi total grid,
+  // supaya tombol "Lihat Semua" hanya muncul kalau memang lebih dari 1 baris.
+  // Diukur ulang saat foto berubah dan saat layar di-resize (jumlah kolom bisa berubah).
+  useEffect(() => {
+    const measure = () => {
+      if (firstItemRef.current && gridInnerRef.current) {
+        const itemHeight = firstItemRef.current.getBoundingClientRect().height;
+        const fullHeight = gridInnerRef.current.getBoundingClientRect().height;
+        setRowHeight(itemHeight);
+        setHasMore(fullHeight > itemHeight + 4);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [state.files]);
 
   if (state.status === 'loading') {
     return (
@@ -289,51 +313,103 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
 
   return (
     <>
-      {/* Grid foto */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-        gap: '8px',
-      }}>
-        {state.files.map((file, idx) => (
+      {/* Bungkus grid: dibatasi tingginya ke 1 baris kalau belum "expanded" */}
+      <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            overflow: 'hidden',
+            maxHeight: expanded || rowHeight === null ? 'none' : `${rowHeight}px`,
+            transition: 'max-height 0.3s ease',
+          }}
+        >
+          {/* Grid foto */}
           <div
-            key={file.id}
-            onClick={() => setLightboxIndex(idx)}
+            ref={gridInnerRef}
             style={{
-              aspectRatio: '1 / 1',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              background: '#f0f0f0',
-              position: 'relative',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
-              (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
-              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '8px',
             }}
           >
-            <img
-              src={file.thumbnailUrl}
-              alt={file.name}
-              loading="lazy"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onError={e => {
-                // Fallback ke Google Drive thumbnail langsung
-                const el = e.target as HTMLImageElement;
-                if (!el.dataset.fallback) {
-                  el.dataset.fallback = '1';
-                  el.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
-                }
-              }}
-            />
+            {state.files.map((file, idx) => (
+              <div
+                key={file.id}
+                ref={idx === 0 ? firstItemRef : undefined}
+                onClick={() => setLightboxIndex(idx)}
+                style={{
+                  aspectRatio: '1 / 1',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  background: '#f0f0f0',
+                  position: 'relative',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                }}
+              >
+                <img
+                  src={file.thumbnailUrl}
+                  alt={file.name}
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  onError={e => {
+                    // Fallback ke Google Drive thumbnail langsung
+                    const el = e.target as HTMLImageElement;
+                    if (!el.dataset.fallback) {
+                      el.dataset.fallback = '1';
+                      el.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
+                    }
+                  }}
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {/* Efek fade di bagian bawah saat masih di-collapse, biar terlihat masih ada lanjutannya */}
+        {!expanded && hasMore && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '48px',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.95))',
+              pointerEvents: 'none',
+              borderRadius: '0 0 8px 8px',
+            }}
+          />
+        )}
       </div>
+
+      {/* Tombol "Lihat Semua Foto" / "Tampilkan Lebih Sedikit" */}
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: '10px' }}>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--primary-color, #2e7d32)',
+              color: 'var(--primary-color, #2e7d32)',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              padding: '6px 18px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+            }}
+          >
+            {expanded ? 'Tampilkan Lebih Sedikit ▲' : `Lihat Semua Foto (${state.files.length}) ▾`}
+          </button>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxIndex !== null && (

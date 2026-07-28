@@ -1,53 +1,36 @@
-# Backup Percakapan & Status Proyek (IMKKSA-MIGRATION-8AFB1C)
+# Backup Catatan Migrasi: IMKKSA-MIGRATION-8AFB1C
 
-**Tanggal Pembaruan:** Senin, 13 Juli 2026
-**Kode Referensi:** `IMKKSA-MIGRATION-8AFB1C`
-**Conversation ID:** `edeb2809-f9a2-4b04-a8e9-748fa18cca16`
-
----
-
-## 1. Status Terakhir Proyek & Langkah yang Berhasil
-* **Git & GitHub Clean-Up:**
-  * File credentials JSON (`website-gpib-banda-aceh-2151919521a6.json` dan `website-imkksa-banda-aceh-sekitar-2151919521a6.json`) telah **dihapus sepenuhnya** dari seluruh history commit Git lokal menggunakan `git filter-branch`.
-  * Git push paksa (`git push origin master --force`) ke repository GitHub baru di akun `imkksabandaaceh@gmail.com` telah **berhasil sukses 100%** tanpa hambatan push protection.
-* **Google Apps Script Baru:**
-  * Konfigurasi `appsscript.json` telah diperbaiki untuk menyertakan akses publik webapp (`ANYONE_ANONYMOUS`).
-  * Kode backend `Code.js` terbaru telah didorong (`clasp push`) dan dideploy sebagai Web App versi aktif (`clasp deploy`).
-  * Otorisasi OAuth Google Drive untuk akun baru (`imkksabandaaceh@gmail.com`) telah disetujui oleh user via editor script (menjalankan fungsi `testGoogleDrive`).
-* **Frontend React & Vercel Baru:**
-  * Alamat email di footer Kop Surat formulir pendaftaran anggota ([src/App.tsx](file:///C:/Users/HP/karo/src/App.tsx#L1579)) telah diubah ke `imkksabandaaceh@gmail.com`.
-  * Proyek Vercel baru berhasil di-import dari GitHub dan dideploy secara otomatis.
-  * Subdomain default Vercel berhasil diubah dari `imkksa-karo-qxsq.vercel.app` menjadi **`imkksakaro.vercel.app`** dan statusnya aktif/dapat diakses.
-  * Penyebaran kode berjalan secara otomatis melalui integrasi GitHub (setiap `git push` ke repositori akan memperbarui situs Vercel).
+## Status Terakhir (14 Juli 2026)
+1. **Pelepasan Domain Lama:**
+   - Domain `www.imkksa-bandaaceh.site` telah berhasil dihapus dari Vercel Dashboard akun lama (`imkksa-karo`).
+2. **Pemasangan Domain Baru:**
+   - Domain `www.imkksa-bandaaceh.site` telah berhasil ditambahkan ke proyek baru (`imkksa-karo-qxsq`).
+   - Status domain di dashboard Vercel baru sudah menunjukkan:
+     - **Nameservers:** Third Party
+     - **Vercel CDN:** Active (Centang Hijau / Valid)
+   - Konfigurasi DNS di Rumahweb **tidak diubah** dan tetap mengarah ke server Vercel.
 
 ---
 
-## 2. Masalah & Solusi yang Sedang Berjalan
+## Analisis Masalah (404: DEPLOYMENT_NOT_FOUND)
+Meskipun status di dashboard Vercel sudah aktif (hijau), saat mengakses domain memunculkan pesan error `404: NOT_FOUND (DEPLOYMENT_NOT_FOUND)`. Ada beberapa kemungkinan penyebabnya:
 
-### A. Pemulihan Domain Kustom (`imkksa-bandaaceh.site` di Rumahweb)
-* **Masalah:** Email pendaftaran Rumahweb lama (`imkksa2006@gmail.com`) telah dihapus oleh Google sehingga user tidak dapat masuk ke panel domain Rumahweb untuk mengganti DNS Record ke Vercel baru.
-* **Status Terkini:** User telah mengirimkan permohonan pemulihan akun/penggantian email ke Customer Support Rumahweb dan sedang menunggu proses estimasi 1x24 jam.
-* **Panduan Tindakan:** Panduan detail mengenai pemulihan akun Rumahweb serta konfigurasi DNS setelah akses diperoleh kembali disimpan di berkas lokal: **`domain_migration_guide.md`** di folder artifacts.
+1. **Penyebab A: Cache DNS / Propagasi Server (Paling Sering Terjadi)**
+   - Browser atau DNS lokal Anda masih menyimpan cache respons error 404 dari waktu sebelum domain dipindahkan secara penuh.
+   - *Solusi:* Tunggu beberapa waktu atau coba akses menggunakan perangkat lain (misal handphone menggunakan paket data seluler) atau melalui mode Incognito dengan koneksi jaringan berbeda.
 
-### B. Pemulihan Data Google Apps Script Lama (Pending/Jika Diperlukan)
-* **Masalah:** Google Apps Script yang lama telah dihapus oleh Google, sehingga data (halaman, settings, pengurus, umat, dll.) tidak dapat ditarik langsung dari cloud lama.
-* **Rencana Solusi:**
-  * Memanfaatkan cache lokal (`localStorage`) dari browser Chrome milik pengguna yang menyimpan key `imkksaSiteContent`.
-  * Menyalin data JSON tersebut dari Console Developer Tools dan menempelkannya ke chat agar asisten dapat mempostingnya ke Apps Script baru untuk pemulihan database.
+2. **Penyebab B: Kesalahan Target Branch Produksi di Vercel**
+   - Berdasarkan screenshot, deployment proyek baru berada di branch `master`.
+   - Secara default, proyek Vercel baru menganggap branch `main` sebagai branch produksi (Production Branch). Jika branch produksi default di Vercel diatur ke `main`, maka deployment di branch `master` akan dianggap sebagai **Preview Deployment** sehingga tidak otomatis dihubungkan ke domain utama (`www.imkksa-bandaaceh.site`).
+   - *Solusi:* Masuk ke **Settings -> Git** di dashboard proyek baru, lalu ubah **Production Branch** dari `main` menjadi `master`.
 
----
-
-## 3. Pembaruan Fitur & Tampilan (13 Juli 2026)
-* **Presisi Foto Pengurus (Penyelarasan Wajah):**
-  * Foto pengurus pada menu *Struktur Pengurus* kini dipotong secara otomatis menggunakan deteksi wajah (*face detection*) server ImageKit dengan parameter `tr=w-400,h-400,fo-face`.
-  * Mengatasi masalah wajah terpotong/tidak presisi pada bingkai bulatan di browser pengguna non-login maupun admin login.
-* **Keamanan NIK / KTP Umat:**
-  * Menambahkan sensor NIK/KTP untuk pengguna non-login di modal Formulir Pendaftaran Anggota.
-  * 3 digit terakhir dari NIK akan diubah menjadi `xxx` (misal: `1234567890123xxx`).
-  * Admin yang telah login tetap dapat melihat NIK secara penuh tanpa sensor.
-* **Sinkronisasi & Rilis:**
-  * Aplikasi telah dibangun ulang (`npm run build`) dan didorong ke cabang master GitHub (`git push origin master`).
-  * Vercel secara otomatis melakukan auto-deploy dari perubahan terbaru ini.
+3. **Penyebab C: Konfigurasi Redirect Domain Utama**
+   - Jika yang ditambahkan hanya `www.imkksa-bandaaceh.site` tanpa domain apex `imkksa-bandaaceh.site` (atau sebaliknya), Vercel mungkin belum me-route request dengan benar.
 
 ---
-*Berikan kode referensi **`IMKKSA-MIGRATION-8AFB1C`** kepada asisten baru untuk meminta mereka langsung membaca file ini guna memahami konteks pengerjaan.*
+
+## Langkah Selanjutnya (Besok)
+Saat kita melanjutkan pekerjaan besok, langkah-langkah yang akan kita lakukan adalah:
+1. Mengecek kembali apakah domain sudah bisa diakses (untuk memastikan apakah masalahnya hanya karena propagasi cache).
+2. Jika masih error 404, kita akan memeriksa pengaturan **Production Branch** di **Settings -> Git** pada proyek baru untuk memastikan branch produksinya mengarah ke `master` (sesuai branch deployment Anda).
+3. Memastikan domain apex (`imkksa-bandaaceh.site`) juga terdaftar dan di-redirect dengan benar ke `www.imkksa-bandaaceh.site`.
