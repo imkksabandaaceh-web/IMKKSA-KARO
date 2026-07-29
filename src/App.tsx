@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
+import APanel from './components/APanel'
 import './App.css'
 import AlbumGallery from './components/GaleriView'
 
@@ -183,7 +184,7 @@ const processHtmlContent = (htmlContent: string): string => {
 
 
 // Types
-type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login';
+type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login' | 'APanel';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -200,6 +201,19 @@ interface SiteSettings {
   logo: string;
   title: string;
   pengurusRaw?: string;
+  // --- Ditambahkan untuk A.Panel (kustomisasi tampilan oleh admin) ---
+  primaryColor?: string;     // warna aksen utama (judul header, border, dll)
+  secondaryColor?: string;   // warna aksen sekunder (hover menu, underline aktif)
+  navBgColor?: string;       // warna latar belakang navbar
+  navTextColor?: string;     // warna teks/list menu navbar
+  siteBgColor?: string;      // warna latar belakang seluruh halaman
+  headerFontFamily?: string;
+  headerFontSize?: string;
+  headerBgImage?: string;    // gambar latar belakang header (opsional)
+  headerBgOverlay?: string;  // overlay gelap di atas gambar header supaya judul tetap terbaca
+  navFontFamily?: string;
+  navFontSize?: string;
+  navFontWeight?: string;
 }
 
 interface GaleriItem {
@@ -276,6 +290,18 @@ const DEFAULT_CONTENT: FullContent = {
   settings: {
     logo: "/LOGO_KARO.jpg",
     title: "IMKKSA Banda Aceh Sekitar",
+    primaryColor: '#2e7d32',
+    secondaryColor: '#8bc34a',
+    navBgColor: '#2f5d50',
+    navTextColor: '#ffffff',
+    siteBgColor: '#f4f8f4',
+    headerFontFamily: "'Playfair Display', serif",
+    headerFontSize: 'clamp(1.8rem, 6vw, 3.2rem)',
+    headerBgImage: '',
+    headerBgOverlay: 'rgba(0, 0, 0, 0.25)',
+    navFontFamily: "'Inter', sans-serif",
+    navFontSize: '1rem',
+    navFontWeight: '500',
   },
   pages: {
     'Beranda': {
@@ -584,6 +610,7 @@ function App() {
     const newContent = {
       ...siteContent,
       settings: {
+        ...siteContent.settings, // PERBAIKAN: pertahankan pengaturan tema (warna/font) dari A.Panel
         logo: finalLogo,
         title: finalSiteTitle,
         pengurusRaw: JSON.stringify(siteContent.pengurus || [])
@@ -611,6 +638,38 @@ function App() {
     } catch (error) {
       console.error("Gagal menyimpan ke Google Drive:", error)
       alert('Gagal sinkron ke Google Drive.');
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Dipakai khusus oleh A.Panel untuk menyimpan pengaturan tema (warna, font, dll).
+  // Terpisah dari saveChanges() supaya tidak ikut memicu logika simpan halaman/PDF.
+  const handleSaveThemeSettings = async (newSettings: SiteSettings) => {
+    setIsSaving(true)
+    const newContent: FullContent = {
+      ...siteContent,
+      settings: {
+        ...siteContent.settings,
+        ...newSettings,
+        pengurusRaw: JSON.stringify(siteContent.pengurus || []),
+      },
+    }
+
+    setSiteContent(newContent)
+    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
+
+    try {
+      const payload = JSON.stringify({ action: 'updateContent', data: newContent })
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: payload,
+      })
+    } catch (error) {
+      console.error('Gagal menyimpan tema ke Google Drive:', error)
+      throw error
     } finally {
       setIsSaving(false)
     }
@@ -1694,6 +1753,17 @@ function App() {
     if (activeTab === 'Data Anggota') return renderDataAnggota()
     if (activeTab === 'Galeri') return renderGaleri()
     if (activeTab === 'Pengurus') return renderPengurus()
+    if (activeTab === 'APanel') {
+      if (!isLoggedIn) return null
+      return (
+        <APanel
+          settings={siteContent.settings}
+          onSaveSettings={handleSaveThemeSettings}
+          onLogout={handleLogout}
+          scriptUrl={SCRIPT_URL}
+        />
+      )
+    }
 
     // Beranda & Jadwal Keluarga — konten halaman saja, tanpa PDF
     const currentPage = siteContent.pages[activeTab]
@@ -1857,9 +1927,30 @@ function App() {
     )
   }
 
+  // --- Pengaturan tema dari A.Panel diterapkan di sini ---
+  const s = siteContent.settings;
+  const appContainerStyle: React.CSSProperties = {
+    ['--primary-color' as any]: s.primaryColor || '#2e7d32',
+    ['--secondary-color' as any]: s.secondaryColor || '#8bc34a',
+    ['--nav-bg' as any]: s.navBgColor || '#2f5d50',
+    ['--nav-text-color' as any]: s.navTextColor || '#ffffff',
+    ['--bg-color' as any]: s.siteBgColor || '#f4f8f4',
+    ['--header-font-family' as any]: s.headerFontFamily || "'Playfair Display', serif",
+    ['--header-font-size' as any]: s.headerFontSize || 'clamp(1.8rem, 6vw, 3.2rem)',
+    ['--nav-font-family' as any]: s.navFontFamily || "'Inter', sans-serif",
+    ['--nav-font-size' as any]: s.navFontSize || '1rem',
+    ['--nav-font-weight' as any]: s.navFontWeight || '500',
+  };
+
+  const headerStyle: React.CSSProperties = s.headerBgImage ? {
+    backgroundImage: `linear-gradient(${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}, ${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}), url(${s.headerBgImage})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  } : {};
+
   return (
-    <div className="app-container">
-      <header className="header">
+    <div className="app-container" style={appContainerStyle}>
+      <header className="header" style={headerStyle}>
         <div className="logo-container"><img src={siteContent.settings.logo || "/LOGO_KARO.jpg"} alt="Logo IMKKSA" /></div>
         <h1>{siteContent.settings.title}</h1>
       </header>
@@ -1872,7 +1963,16 @@ function App() {
           <li className={activeTab === 'Data Anggota' ? 'active' : ''} onClick={() => setActiveTab('Data Anggota')}>Data Anggota</li>
           <li className={activeTab === 'Pengurus' ? 'active' : ''} onClick={() => setActiveTab('Pengurus')}>Pengurus</li>
           {isLoggedIn ? (
-            <li onClick={handleLogout}>Logout (Admin)</li>
+            <>
+              <li
+                className={activeTab === 'APanel' ? 'active' : ''}
+                onClick={() => setActiveTab('APanel')}
+                style={{ color: '#facc15', fontWeight: 700 }}
+              >
+                ⚙️ A.Panel
+              </li>
+              <li onClick={handleLogout}>Logout (Admin)</li>
+            </>
           ) : (
             <li className={activeTab === 'Login' ? 'active' : ''} onClick={() => setActiveTab('Login')}>Login</li>
           )}
