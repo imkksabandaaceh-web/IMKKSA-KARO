@@ -145,7 +145,7 @@ h1, h2, h3 {
 .logo-container {
   display: inline-block;
   background: var(--white);
-  padding: 20px;
+  padding: 6px;
   border-radius: 50%;
   box-shadow: var(--shadow-md);
   margin-bottom: 25px;
