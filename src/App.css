@@ -128,6 +128,11 @@ h1, h2, h3 {
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
+  /* PERBAIKAN: --bg-color di-set via inline style di elemen ini (App.tsx),
+     jadi background-color juga harus dibaca di elemen yang sama, bukan di
+     `body` (induknya) — custom property CSS tidak mengalir dari anak ke induk. */
+  background-color: var(--bg-color);
+  transition: background-color 0.3s ease;
 }
 
 /* Header */
