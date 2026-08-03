@@ -254,6 +254,13 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
   const [expanded, setExpanded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // ── State & ref untuk membatasi tampilan ke 1 BARIS saja saat belum expanded ──
+  // (jumlah foto per baris otomatis menyesuaikan lebar layar: 4, 5, atau 6 dst.)
+  const [rowHeight, setRowHeight] = useState<number | null>(null);
+  const [hasMoreRows, setHasMoreRows] = useState(false);
+  const gridInnerRef = useRef<HTMLDivElement>(null);
+  const firstItemRef = useRef<HTMLDivElement>(null);
+
   // ── Ref untuk lazy-load: album baru fetch saat terlihat di layar ────────
   const containerRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
@@ -357,10 +364,28 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
   }, [folderId, scriptUrl, loadPreview]);
 
   // Tombol "Lihat Semua" muncul kalau: masih ada halaman berikutnya di server,
-  // ATAU semua foto sudah termuat tapi jumlahnya lebih dari batas preview.
+  // ATAU baris foto yang sudah dimuat memang lebih dari 1 baris secara visual.
   const hasMoreOnServer = state.nextPageToken !== null;
-  const showToggleButton = hasMoreOnServer || state.files.length > PREVIEW_LIMIT;
+  const showToggleButton = hasMoreOnServer || hasMoreRows;
   const visibleFiles = expanded ? state.files : state.files.slice(0, PREVIEW_LIMIT);
+
+  // Ukur tinggi 1 baris foto & bandingkan dengan tinggi total grid yang sedang
+  // dirender, supaya tombol "Lihat Semua" hanya muncul kalau memang ada baris
+  // ke-2 dst yang tersembunyi. Diukur ulang saat foto berubah & layar di-resize
+  // (jumlah kolom per baris bisa berubah tergantung lebar layar).
+  useEffect(() => {
+    const measure = () => {
+      if (firstItemRef.current && gridInnerRef.current) {
+        const itemHeight = firstItemRef.current.getBoundingClientRect().height;
+        const fullHeight = gridInnerRef.current.getBoundingClientRect().height;
+        setRowHeight(itemHeight);
+        setHasMoreRows(fullHeight > itemHeight + 4);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [visibleFiles]);
 
   const handleToggleClick = () => {
     if (expanded) {
@@ -441,52 +466,80 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
 
   return (
     <div ref={containerRef}>
-      {/* Grid foto: hanya render foto yang memang sedang "visible" (preview atau semua) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-          gap: '8px',
-        }}
-      >
-        {visibleFiles.map((file, idx) => (
+      {/* Bungkus grid: dibatasi tingginya ke 1 baris kalau belum "expanded" */}
+      <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            overflow: 'hidden',
+            maxHeight: expanded || rowHeight === null ? 'none' : `${rowHeight}px`,
+            transition: 'max-height 0.3s ease',
+          }}
+        >
           <div
-            key={file.id}
-            onClick={() => setLightboxIndex(idx)}
+            ref={gridInnerRef}
             style={{
-              aspectRatio: '1 / 1',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              background: '#f0f0f0',
-              position: 'relative',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
-              (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
-              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '8px',
             }}
           >
-            <img
-              src={file.thumbnailUrl}
-              alt={file.name}
-              loading="lazy"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              onError={e => {
-                // Fallback ke Google Drive thumbnail langsung
-                const el = e.target as HTMLImageElement;
-                if (!el.dataset.fallback) {
-                  el.dataset.fallback = '1';
-                  el.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
-                }
-              }}
-            />
+            {visibleFiles.map((file, idx) => (
+              <div
+                key={file.id}
+                ref={idx === 0 ? firstItemRef : undefined}
+                onClick={() => setLightboxIndex(idx)}
+                style={{
+                  aspectRatio: '1 / 1',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  background: '#f0f0f0',
+                  position: 'relative',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                }}
+              >
+                <img
+                  src={file.thumbnailUrl}
+                  alt={file.name}
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  onError={e => {
+                    // Fallback ke Google Drive thumbnail langsung
+                    const el = e.target as HTMLImageElement;
+                    if (!el.dataset.fallback) {
+                      el.dataset.fallback = '1';
+                      el.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
+                    }
+                  }}
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {/* Efek fade di bagian bawah saat masih di-collapse, biar terlihat masih ada lanjutannya */}
+        {!expanded && showToggleButton && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '32px',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.95))',
+              pointerEvents: 'none',
+              borderRadius: '0 0 8px 8px',
+            }}
+          />
+        )}
       </div>
 
       {/* Tombol "Lihat Semua Foto" / "Tampilkan Lebih Sedikit" */}
@@ -511,7 +564,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
               ? 'Memuat semua foto...'
               : expanded
                 ? 'Tampilkan Lebih Sedikit ▲'
-                : `Lihat Semua Foto${hasMoreOnServer ? '' : ` (${state.files.length})`} ▾`}
+                : `Klik untuk Lihat Semua Foto${hasMoreOnServer ? '' : ` (${state.files.length})`} ▾`}
           </button>
         </div>
       )}
