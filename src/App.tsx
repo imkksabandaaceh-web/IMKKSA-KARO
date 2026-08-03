@@ -1383,7 +1383,12 @@ function App() {
                   <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'photo', true)} />
                   {umatForm.photo && (
                     <div className="preview-container">
-                      <img src={toImageKitUrl(umatForm.photo, 400)} alt="Preview Foto" className="file-preview-img" />
+                      <img
+                        src={toImageKitUrl(umatForm.photo, 400)}
+                        alt="Preview Foto"
+                        className="file-preview-img"
+                        style={{ objectFit: 'cover', objectPosition: 'top center' }}
+                      />
                       <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, photo: '' })}>Hapus Foto</button>
                     </div>
                   )}
@@ -1757,7 +1762,12 @@ function App() {
                       />
                       {userUmatForm.photo && (
                         <div className="preview-container">
-                          <img src={toImageKitUrl(userUmatForm.photo, 400)} alt="Preview Foto" className="file-preview-img" />
+                          <img
+                            src={toImageKitUrl(userUmatForm.photo, 400)}
+                            alt="Preview Foto"
+                            className="file-preview-img"
+                            style={{ objectFit: 'cover', objectPosition: 'top center' }}
+                          />
                           <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
                         </div>
                       )}
@@ -1968,7 +1978,11 @@ function App() {
 
               <div className="details-photo-box">
                 {selectedUmat.photo ? (
-                  <img src={toImageKitUrl(selectedUmat.photo, 400)} alt="Pas Foto" />
+                  <img
+                    src={toImageKitUrl(selectedUmat.photo, 400)}
+                    alt="Pas Foto"
+                    style={{ objectFit: 'cover', objectPosition: 'top center' }}
+                  />
                 ) : (
                   <div style={{ width: '120px', height: '160px', border: '2px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '0.8rem', color: '#999', textAlign: 'center', padding: '10px' }}>
                     Pas Foto 3x4
