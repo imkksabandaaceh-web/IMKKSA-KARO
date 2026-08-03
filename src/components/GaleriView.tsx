@@ -232,15 +232,71 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
   const gridInnerRef = useRef<HTMLDivElement>(null);
   const firstItemRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setState({ status: 'loading', files: [] });
+  // ── Ref untuk lazy-load: album baru fetch saat terlihat di layar ────────
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasStartedRef = useRef(false);
+
+  // Ambil daftar foto, dengan cache session & retry otomatis kalau gagal
+  // (Apps Script punya batas kuota eksekusi/menit; kalau banyak album dimuat
+  // bersamaan, sebagian bisa gagal sesaat lalu berhasil kalau dicoba ulang)
+  const loadPhotos = useCallback((attempt = 1) => {
+    const cacheKey = `galeri_cache_${folderId}`;
+
+    if (attempt === 1) {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const files = JSON.parse(cached);
+          setState({ status: 'success', files });
+          return;
+        } catch {
+          // cache rusak, lanjut fetch normal di bawah
+        }
+      }
+      setState({ status: 'loading', files: [] });
+    }
+
     fetchFolderFiles(folderId, scriptUrl)
-      .then(files => setState({ status: 'success', files }))
+      .then(files => {
+        setState({ status: 'success', files });
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(files));
+        } catch {
+          // sessionStorage penuh/tidak tersedia, abaikan saja (tidak fatal)
+        }
+      })
       .catch(err => {
-        console.error('[GaleriView] Gagal memuat foto:', err);
-        setState({ status: 'error', files: [], error: err.message });
+        console.error(`[GaleriView] Gagal memuat foto (percobaan ${attempt}):`, err);
+        if (attempt < 3) {
+          // coba lagi otomatis dengan jeda yang makin lama (1.5s, 3s)
+          setTimeout(() => loadPhotos(attempt + 1), attempt * 1500);
+        } else {
+          setState({ status: 'error', files: [], error: err.message });
+        }
       });
   }, [folderId, scriptUrl]);
+
+  // Mulai memuat HANYA saat album ini mendekati area layar (lazy-load),
+  // supaya tidak semua album menembak Apps Script bersamaan sekaligus.
+  useEffect(() => {
+    hasStartedRef.current = false;
+    setState({ status: 'idle', files: [] });
+
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !hasStartedRef.current) {
+          hasStartedRef.current = true;
+          loadPhotos(1);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '400px' } // mulai load sedikit sebelum album benar-benar kelihatan
+    );
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [folderId, scriptUrl, loadPhotos]);
 
   // Ukur tinggi 1 baris foto & bandingkan dengan tinggi total grid,
   // supaya tombol "Lihat Semua" hanya muncul kalau memang lebih dari 1 baris.
@@ -259,9 +315,9 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
     return () => window.removeEventListener('resize', measure);
   }, [state.files]);
 
-  if (state.status === 'loading') {
+  if (state.status === 'idle' || state.status === 'loading') {
     return (
-      <div style={{ padding: '32px', textAlign: 'center', color: '#888' }}>
+      <div ref={containerRef} style={{ padding: '32px', textAlign: 'center', color: '#888' }}>
         <div style={{
           width: '36px', height: '36px', borderRadius: '50%',
           border: '3px solid #e0e0e0', borderTopColor: 'var(--primary-color, #2e7d32)',
@@ -274,7 +330,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
 
   if (state.status === 'error') {
     return (
-      <div style={{
+      <div ref={containerRef} style={{
         padding: '20px 24px', background: '#fff8e1',
         borderRadius: '8px', border: '1px solid #ffe082', fontSize: '0.88rem',
       }}>
@@ -286,33 +342,46 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
             ? 'Google Apps Script perlu diperbarui untuk mendukung listing folder. Lihat panduan di bawah.'
             : 'Terjadi kesalahan saat mengambil daftar foto dari Google Drive.'}
         </p>
-        <a
-          href={folderUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            color: '#1a73e8', textDecoration: 'none',
-            padding: '8px 16px', border: '1px solid #1a73e8',
-            borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600,
-          }}
-        >
-          📂 Lihat foto di Google Drive
-        </a>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => { hasStartedRef.current = true; loadPhotos(1); }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              color: '#fff', background: 'var(--primary-color, #2e7d32)',
+              textDecoration: 'none', border: 'none', cursor: 'pointer',
+              padding: '8px 16px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600,
+            }}
+          >
+            🔄 Coba Lagi
+          </button>
+          <a
+            href={folderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              color: '#1a73e8', textDecoration: 'none',
+              padding: '8px 16px', border: '1px solid #1a73e8',
+              borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600,
+            }}
+          >
+            📂 Lihat foto di Google Drive
+          </a>
+        </div>
       </div>
     );
   }
 
   if (state.status === 'success' && state.files.length === 0) {
     return (
-      <p style={{ textAlign: 'center', color: '#999', padding: '24px 0', fontSize: '0.9rem' }}>
+      <p ref={containerRef} style={{ textAlign: 'center', color: '#999', padding: '24px 0', fontSize: '0.9rem' }}>
         Folder ini belum berisi foto.
       </p>
     );
   }
 
   return (
-    <>
+    <div ref={containerRef}>
       {/* Bungkus grid: dibatasi tingginya ke 1 baris kalau belum "expanded" */}
       <div style={{ position: 'relative' }}>
         <div
@@ -419,7 +488,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
           onClose={() => setLightboxIndex(null)}
         />
       )}
-    </>
+    </div>
   );
 };
 
