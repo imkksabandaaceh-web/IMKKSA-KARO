@@ -5,6 +5,9 @@ import AdminDashboard from './components/AdminDashboard'
 import APanel from './components/APanel'
 import './App.css'
 import AlbumGallery from './components/GaleriView'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const compressImage = (base64: string, maxWidth: number, quality: number): Promise<string> => {
   return new Promise((resolve) => {
@@ -1251,6 +1254,90 @@ function App() {
         )
       : [];
 
+    // --- Export Data Anggota ke Excel (.xlsx) ---
+    const handleExportExcel = () => {
+      if (filteredAdminUmat.length === 0) {
+        alert('Tidak ada data anggota untuk diunduh.');
+        return;
+      }
+      const dataToExport = filteredAdminUmat.map((u, idx) => ({
+        No: idx + 1,
+        'Nama Lengkap': u.nama,
+        'NIK / No. KTP': u.nik || '-',
+        'Tempat Lahir': u.tempatLahir || '-',
+        'Tanggal Lahir': formatDateDevice(u.tanggalLahir),
+        'Alamat Lengkap': u.alamat || '-',
+        'No. HP / WA': u.noHp || '-',
+        'Status Keanggotaan': u.status,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      ws['!cols'] = [
+        { wch: 5 },  // No
+        { wch: 25 }, // Nama
+        { wch: 20 }, // NIK
+        { wch: 18 }, // Tempat Lahir
+        { wch: 18 }, // Tanggal Lahir
+        { wch: 35 }, // Alamat
+        { wch: 16 }, // No HP
+        { wch: 16 }, // Status
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Data Anggota');
+
+      const tanggal = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Data_Anggota_IMKKSA_${tanggal}.xlsx`);
+    };
+
+    // --- Export Data Anggota ke PDF ---
+    const handleExportPDF = () => {
+      if (filteredAdminUmat.length === 0) {
+        alert('Tidak ada data anggota untuk diunduh.');
+        return;
+      }
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+      doc.setFontSize(13);
+      doc.setFont(undefined, 'bold');
+      doc.text('DAFTAR ANGGOTA IMKKSA BANDA ACEH SEKITAR', 14, 15);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      doc.text(`Dicetak pada: ${tanggalCetak}  |  Total Anggota: ${filteredAdminUmat.length}`, 14, 21);
+
+      const tableRows = filteredAdminUmat.map((u, idx) => [
+        idx + 1,
+        u.nama,
+        u.nik || '-',
+        formatDateDevice(u.tanggalLahir),
+        u.alamat || '-',
+        u.noHp || '-',
+        u.status,
+      ]);
+
+      autoTable(doc, {
+        startY: 26,
+        head: [['No', 'Nama Lengkap', 'NIK / No. KTP', 'Tgl Lahir', 'Alamat Lengkap', 'No. HP/WA', 'Status']],
+        body: tableRows,
+        styles: { fontSize: 7.5, cellPadding: 2, valign: 'middle' },
+        headStyles: { fillColor: [46, 125, 50], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [244, 248, 244] },
+        columnStyles: {
+          0: { cellWidth: 8 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 70 },
+          5: { cellWidth: 28 },
+          6: { cellWidth: 22 },
+        },
+      });
+
+      const tanggal = new Date().toISOString().slice(0, 10);
+      doc.save(`Data_Anggota_IMKKSA_${tanggal}.pdf`);
+    };
+
     return (
       <div className="page-content">
         {isLoggedIn ? (
@@ -1388,8 +1475,26 @@ function App() {
             </div>
             
             <div className="admin-umat-list" style={{ marginTop: '40px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
                 <h3>Daftar Anggota Resmi ({approvedUmat.length})</h3>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn-edit-small"
+                    onClick={handleExportExcel}
+                    style={{ background: '#e8f5e9', color: '#1b5e20', border: '1px solid #a5d6a7', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    📊 Unduh Excel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-edit-small"
+                    onClick={handleExportPDF}
+                    style={{ background: '#ffebee', color: '#b71c1c', border: '1px solid #ffcdd2', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    📄 Unduh PDF
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px' }}>
                 <input type="text" placeholder="Cari Anggota Resmi..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
