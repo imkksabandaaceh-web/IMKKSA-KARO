@@ -50,8 +50,13 @@ interface DriveFile {
 interface AlbumPhotosState {
   status: 'idle' | 'loading' | 'success' | 'error';
   files: DriveFile[];
+  nextPageToken: string | null; // ada isinya kalau masih ada foto lain yang belum diambil
   error?: string;
 }
+
+// Jumlah foto yang diambil pada pemuatan pertama (preview cepat).
+// Sisanya baru diambil saat tombol "Lihat Semua Foto" diklik.
+const PREVIEW_LIMIT = 12;
 
 // ── Helper: ambil daftar file dari folder Google Drive (public JSON feed) ────
 // Google Drive menyediakan RSS/Atom feed publik yang bisa dibaca tanpa API key.
@@ -67,12 +72,29 @@ interface AlbumPhotosState {
 // Sayangnya ini butuh API key. Solusi yang benar-benar zero-backend:
 // Gunakan GOOGLE_SCRIPT_URL yang sudah ada di project untuk listing folder.
 
+interface FetchFilesResult {
+  files: DriveFile[];
+  nextPageToken: string | null;
+}
+
 const fetchFolderFiles = async (
   folderId: string,
-  scriptUrl: string
-): Promise<DriveFile[]> => {
-  // Panggil Google Apps Script yang sudah ada, tambahkan action=listFolder
-  const url = `${scriptUrl}?action=listFolder&folderId=${encodeURIComponent(folderId)}&t=${Date.now()}`;
+  scriptUrl: string,
+  limit?: number,
+  pageToken?: string | null
+): Promise<FetchFilesResult> => {
+  // Panggil Google Apps Script yang sudah ada (action=listFolder).
+  // limit → hanya minta segini banyak foto (preview cepat).
+  // pageToken → lanjutkan dari posisi terakhir, bukan dari awal folder lagi.
+  const qs = new URLSearchParams({
+    action: 'listFolder',
+    folderId,
+    t: Date.now().toString(),
+  });
+  if (limit) qs.set('limit', String(limit));
+  if (pageToken) qs.set('pageToken', pageToken);
+
+  const url = `${scriptUrl}?${qs.toString()}`;
   const response = await fetch(url, { method: 'GET', mode: 'cors', redirect: 'follow' });
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -85,13 +107,16 @@ const fetchFolderFiles = async (
     throw new Error(data.error || 'Format respons tidak dikenali');
   }
 
-  return data.files.map((f: any) => ({
-    id: f.id,
-    name: f.name,
-    thumbnailUrl: toImageKitUrl(f.id, 400),
-    fullUrl: toImageKitUrl(f.id, 1200),
-    viewUrl: `https://drive.google.com/file/d/${f.id}/view`,
-  }));
+  return {
+    files: data.files.map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      thumbnailUrl: toImageKitUrl(f.id, 400),
+      fullUrl: toImageKitUrl(f.id, 1200),
+      viewUrl: `https://drive.google.com/file/d/${f.id}/view`,
+    })),
+    nextPageToken: data.nextPageToken || null,
+  };
 };
 
 // ── Komponen: Lightbox ────────────────────────────────────────────────────────
@@ -222,65 +247,98 @@ interface AlbumGalleryProps {
 }
 
 const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, scriptUrl }) => {
-  const [state, setState] = useState<AlbumPhotosState>({ status: 'idle', files: [] });
+  const [state, setState] = useState<AlbumPhotosState>({ status: 'idle', files: [], nextPageToken: null });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // ── State & ref untuk fitur "1 baris + Lihat Semua" ─────────────────────
+  // ── State untuk fitur "preview + Lihat Semua" ───────────────────────────
   const [expanded, setExpanded] = useState(false);
-  const [rowHeight, setRowHeight] = useState<number | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const gridInnerRef = useRef<HTMLDivElement>(null);
-  const firstItemRef = useRef<HTMLDivElement>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // ── Ref untuk lazy-load: album baru fetch saat terlihat di layar ────────
   const containerRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
 
-  // Ambil daftar foto, dengan cache session & retry otomatis kalau gagal
-  // (Apps Script punya batas kuota eksekusi/menit; kalau banyak album dimuat
-  // bersamaan, sebagian bisa gagal sesaat lalu berhasil kalau dicoba ulang)
-  const loadPhotos = useCallback((attempt = 1) => {
-    const cacheKey = `galeri_cache_${folderId}`;
+  const cacheKey = `galeri_cache_${folderId}`;
 
+  // Ambil PREVIEW foto saja (cepat), dengan cache session & retry otomatis
+  // kalau gagal (Apps Script punya batas kuota eksekusi/menit; kalau banyak
+  // album dimuat bersamaan, sebagian bisa gagal sesaat lalu berhasil kalau
+  // dicoba ulang). Cache hanya dipakai kalau sebelumnya sudah pernah dimuat
+  // LENGKAP (full), supaya tidak menyimpan potongan data yang tidak lengkap.
+  const loadPreview = useCallback((attempt = 1) => {
     if (attempt === 1) {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         try {
-          const files = JSON.parse(cached);
-          setState({ status: 'success', files });
-          return;
+          const parsed = JSON.parse(cached);
+          if (parsed.full && Array.isArray(parsed.files)) {
+            setState({ status: 'success', files: parsed.files, nextPageToken: null });
+            return;
+          }
         } catch {
           // cache rusak, lanjut fetch normal di bawah
         }
       }
-      setState({ status: 'loading', files: [] });
+      setState({ status: 'loading', files: [], nextPageToken: null });
     }
 
-    fetchFolderFiles(folderId, scriptUrl)
-      .then(files => {
-        setState({ status: 'success', files });
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify(files));
-        } catch {
-          // sessionStorage penuh/tidak tersedia, abaikan saja (tidak fatal)
+    fetchFolderFiles(folderId, scriptUrl, PREVIEW_LIMIT)
+      .then(({ files, nextPageToken }) => {
+        setState({ status: 'success', files, nextPageToken });
+        // Kalau ternyata semua foto sudah termuat dalam preview ini (album kecil),
+        // langsung simpan sebagai cache "full".
+        if (!nextPageToken) {
+          try {
+            sessionStorage.setItem(cacheKey, JSON.stringify({ files, full: true }));
+          } catch {
+            // sessionStorage penuh/tidak tersedia, abaikan saja (tidak fatal)
+          }
         }
       })
       .catch(err => {
         console.error(`[GaleriView] Gagal memuat foto (percobaan ${attempt}):`, err);
         if (attempt < 3) {
           // coba lagi otomatis dengan jeda yang makin lama (1.5s, 3s)
-          setTimeout(() => loadPhotos(attempt + 1), attempt * 1500);
+          setTimeout(() => loadPreview(attempt + 1), attempt * 1500);
         } else {
-          setState({ status: 'error', files: [], error: err.message });
+          setState({ status: 'error', files: [], nextPageToken: null, error: err.message });
         }
       });
-  }, [folderId, scriptUrl]);
+  }, [folderId, scriptUrl, cacheKey]);
+
+  // Ambil SISA foto (dipanggil saat tombol "Lihat Semua Foto" diklik).
+  // Melanjutkan dari nextPageToken yang sudah ada, bukan scan folder dari awal.
+  const loadRemaining = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      let allFiles = state.files;
+      let token = state.nextPageToken;
+      while (token) {
+        const { files: more, nextPageToken } = await fetchFolderFiles(folderId, scriptUrl, undefined, token);
+        allFiles = [...allFiles, ...more];
+        token = nextPageToken;
+      }
+      setState({ status: 'success', files: allFiles, nextPageToken: null });
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({ files: allFiles, full: true }));
+      } catch {
+        // abaikan, tidak fatal
+      }
+      setExpanded(true);
+    } catch (err: any) {
+      console.error('[GaleriView] Gagal memuat sisa foto:', err);
+      // biarkan preview yang sudah ada tetap tampil, jangan ganggu UX yang sudah berjalan
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [folderId, scriptUrl, state.files, state.nextPageToken, cacheKey]);
 
   // Mulai memuat HANYA saat album ini mendekati area layar (lazy-load),
   // supaya tidak semua album menembak Apps Script bersamaan sekaligus.
   useEffect(() => {
     hasStartedRef.current = false;
-    setState({ status: 'idle', files: [] });
+    setState({ status: 'idle', files: [], nextPageToken: null });
+    setExpanded(false);
 
     if (!containerRef.current) return;
 
@@ -288,7 +346,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
       (entries) => {
         if (entries[0].isIntersecting && !hasStartedRef.current) {
           hasStartedRef.current = true;
-          loadPhotos(1);
+          loadPreview(1);
           observer.disconnect();
         }
       },
@@ -296,24 +354,25 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
     );
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [folderId, scriptUrl, loadPhotos]);
+  }, [folderId, scriptUrl, loadPreview]);
 
-  // Ukur tinggi 1 baris foto & bandingkan dengan tinggi total grid,
-  // supaya tombol "Lihat Semua" hanya muncul kalau memang lebih dari 1 baris.
-  // Diukur ulang saat foto berubah dan saat layar di-resize (jumlah kolom bisa berubah).
-  useEffect(() => {
-    const measure = () => {
-      if (firstItemRef.current && gridInnerRef.current) {
-        const itemHeight = firstItemRef.current.getBoundingClientRect().height;
-        const fullHeight = gridInnerRef.current.getBoundingClientRect().height;
-        setRowHeight(itemHeight);
-        setHasMore(fullHeight > itemHeight + 4);
-      }
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [state.files]);
+  // Tombol "Lihat Semua" muncul kalau: masih ada halaman berikutnya di server,
+  // ATAU semua foto sudah termuat tapi jumlahnya lebih dari batas preview.
+  const hasMoreOnServer = state.nextPageToken !== null;
+  const showToggleButton = hasMoreOnServer || state.files.length > PREVIEW_LIMIT;
+  const visibleFiles = expanded ? state.files : state.files.slice(0, PREVIEW_LIMIT);
+
+  const handleToggleClick = () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    if (hasMoreOnServer) {
+      loadRemaining(); // akan set expanded(true) sendiri setelah selesai
+    } else {
+      setExpanded(true);
+    }
+  };
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -344,7 +403,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
         </p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
-            onClick={() => { hasStartedRef.current = true; loadPhotos(1); }}
+            onClick={() => { hasStartedRef.current = true; loadPreview(1); }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               color: '#fff', background: 'var(--primary-color, #2e7d32)',
@@ -382,88 +441,60 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
 
   return (
     <div ref={containerRef}>
-      {/* Bungkus grid: dibatasi tingginya ke 1 baris kalau belum "expanded" */}
-      <div style={{ position: 'relative' }}>
-        <div
-          style={{
-            overflow: 'hidden',
-            maxHeight: expanded || rowHeight === null ? 'none' : `${rowHeight}px`,
-            transition: 'max-height 0.3s ease',
-          }}
-        >
-          {/* Grid foto */}
+      {/* Grid foto: hanya render foto yang memang sedang "visible" (preview atau semua) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+          gap: '8px',
+        }}
+      >
+        {visibleFiles.map((file, idx) => (
           <div
-            ref={gridInnerRef}
+            key={file.id}
+            onClick={() => setLightboxIndex(idx)}
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: '8px',
+              aspectRatio: '1 / 1',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              background: '#f0f0f0',
+              position: 'relative',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
+              (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
             }}
           >
-            {state.files.map((file, idx) => (
-              <div
-                key={file.id}
-                ref={idx === 0 ? firstItemRef : undefined}
-                onClick={() => setLightboxIndex(idx)}
-                style={{
-                  aspectRatio: '1 / 1',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  background: '#f0f0f0',
-                  position: 'relative',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.transform = 'scale(1.03)';
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
-                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-                }}
-              >
-                <img
-                  src={file.thumbnailUrl}
-                  alt={file.name}
-                  loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  onError={e => {
-                    // Fallback ke Google Drive thumbnail langsung
-                    const el = e.target as HTMLImageElement;
-                    if (!el.dataset.fallback) {
-                      el.dataset.fallback = '1';
-                      el.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
-                    }
-                  }}
-                />
-              </div>
-            ))}
+            <img
+              src={file.thumbnailUrl}
+              alt={file.name}
+              loading="lazy"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={e => {
+                // Fallback ke Google Drive thumbnail langsung
+                const el = e.target as HTMLImageElement;
+                if (!el.dataset.fallback) {
+                  el.dataset.fallback = '1';
+                  el.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
+                }
+              }}
+            />
           </div>
-        </div>
-
-        {/* Efek fade di bagian bawah saat masih di-collapse, biar terlihat masih ada lanjutannya */}
-        {!expanded && hasMore && (
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: '48px',
-              background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.95))',
-              pointerEvents: 'none',
-              borderRadius: '0 0 8px 8px',
-            }}
-          />
-        )}
+        ))}
       </div>
 
       {/* Tombol "Lihat Semua Foto" / "Tampilkan Lebih Sedikit" */}
-      {hasMore && (
+      {showToggleButton && (
         <div style={{ textAlign: 'center', marginTop: '10px' }}>
           <button
-            onClick={() => setExpanded(v => !v)}
+            onClick={handleToggleClick}
+            disabled={loadingMore}
             style={{
               background: 'transparent',
               border: '1px solid var(--primary-color, #2e7d32)',
@@ -472,10 +503,15 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
               fontSize: '0.85rem',
               padding: '6px 18px',
               borderRadius: '20px',
-              cursor: 'pointer',
+              cursor: loadingMore ? 'default' : 'pointer',
+              opacity: loadingMore ? 0.7 : 1,
             }}
           >
-            {expanded ? 'Tampilkan Lebih Sedikit ▲' : `Lihat Semua Foto (${state.files.length}) ▾`}
+            {loadingMore
+              ? 'Memuat semua foto...'
+              : expanded
+                ? 'Tampilkan Lebih Sedikit ▲'
+                : `Lihat Semua Foto${hasMoreOnServer ? '' : ` (${state.files.length})`} ▾`}
           </button>
         </div>
       )}
