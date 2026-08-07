@@ -134,10 +134,15 @@ create table if not exists public.umat (
   Apps Script (`mode: 'no-cors'`, tidak mengganggu alur pengguna) untuk memicu email admin.
 
 ### 4.3 Hasil verifikasi
-- Endpoint live v6 sudah mengeksekusi aksi baru (terbukti dari respons server).
-- Email belum terkirim sampai **owner mengotorisasi scope `script.send_mail`** (sekali saja, 30 detik).
+- **✅ Email terkirim & terverifikasi:** log editor *"Email uji terkirim ke imkksabandaaceh@gmail.com"* dan
+  endpoint web app merespons `{"success":true}`.
+- **Proses otorisasi** (kunci sukses): deployment web app harus dibuat **via UI editor**
+  (Deploy → New deployment) + fungsi `testKirimEmailUji` dijalankan di editor dengan akun
+  **imkksabandaaceh@gmail.com** (pemilik script) agar scope `script.send_mail` disetujui.
+- **URL situs berubah** → `SCRIPT_URL` di `App.tsx` diperbarui ke deployment baru.
 - **RLS diuji ulang menyeluruh:** insert anon `is_pending=true` → 201 (diterima) dalam semua
   variasi kolom; anon `select` hanya melihat anggota disetujui; anon `delete` → 0 baris (diblokir RLS).
+- `doGet` diperkeras agar aman dijalankan manual dari editor (e tanpa parameter).
 
 ---
 
@@ -156,7 +161,8 @@ create table if not exists public.umat (
 
 | Deployment | Versi | Isi |
 |---|---|---|
-| `AKfycbyaEatvxMhJfw...` (URL situs, tidak berubah) | **v3** → **v4** → **v5** → **v6** | Folder anggota + bersihkan umat + notifikasi email + scope MailApp |
+| `AKfycbweKv2UIvRo7nDs...` (**URL SITUS BARU**) | **v9** | Folder anggota + bersihkan umat + notifikasi email + scope MailApp (dibuat via UI agar ter-otorisasi) |
+| `AKfycbyaEatvxMhJfw...` (URL lama, tak terpakai) | v3 → v8 | Deployment lama sebelum migrasi URL |
 
 ---
 

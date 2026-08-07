@@ -10,9 +10,23 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// Fungsi UJI: jalankan dari editor Apps Script (pilih testKirimEmailUji → Run).
+// Memicu izin "Kirim email as you" dan mengirim email uji ke ADMIN_EMAIL.
+function testKirimEmailUji() {
+  MailApp.sendEmail({
+    to: ADMIN_EMAIL,
+    subject: "IMKKSA — Uji Notifikasi Email (berhasil)",
+    htmlBody: "<p>Ini email uji dari sistem IMKKSA. Jika Anda menerima email ini, berarti izin " +
+              "kirim email sudah aktif dan notifikasi pendaftaran anggota baru akan berfungsi. ✅</p>"
+  });
+  Logger.log("Email uji terkirim ke " + ADMIN_EMAIL);
+  return "Email uji terkirim ke " + ADMIN_EMAIL;
+}
+
 function doGet(e) {
-  var action = e.parameter.action;
-  var params = e.parameter;
+  // e berisi event web app; undefined saat fungsi dijalankan manual dari editor (Run).
+  var params = (e && e.parameter) || {};
+  var action = params.action;
 
   // ── TAMBAHKAN BLOK INI ── (taruh di bagian paling atas if/else)
   if (params.action === 'listFolder') {
@@ -38,7 +52,7 @@ function doGet(e) {
   
   // LOGIKA UTAMA: Mengambil foto native dari Folder Google Drive
   if (action === "getAlbumPhotos") {
-    var folderId = e.parameter.folderId;
+    var folderId = params.folderId;
     
     try {
       if (!folderId) {
