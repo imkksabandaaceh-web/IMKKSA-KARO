@@ -1,5 +1,15 @@
 // Nama File: Code.gs
 
+// Email admin tujuan notifikasi pendaftaran anggota baru (ganti sesuai kebutuhan).
+var ADMIN_EMAIL = "imkksabandaaceh@gmail.com";
+
+// Helper: amankan teks agar aman ditampilkan di dalam HTML email
+function escapeHtml(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function doGet(e) {
   var action = e.parameter.action;
   var params = e.parameter;
@@ -106,6 +116,38 @@ function doPost(e) {
       var fileName = "IMG_" + Date.now();
       var uploadResult = uploadBase64ToFolder(data.base64, fileName, folder);
       return ContentService.createTextOutput(JSON.stringify(uploadResult))
+                           .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "kirimNotifikasiPendaftaran") {
+      // Notifikasi email ke admin saat ada pendaftaran anggota baru (is_pending=true).
+      // Proteksi spam: setiap id hanya boleh memicu 1 email dalam 6 jam (CacheService).
+      var recId = (data && data.id) || "";
+      if (recId.indexOf("pending_") !== 0) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "id tidak valid" }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+      var cache = CacheService.getScriptCache();
+      var cacheKey = "notif_pendaftaran_" + recId;
+      if (cache.get(cacheKey)) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Sudah dinotifikasi" }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+      cache.put(cacheKey, "1", 21600); // 6 jam
+
+      var nama = escapeHtml((data && data.nama) || "Tanpa nama");
+      var noHp = escapeHtml((data && data.noHp) || "-");
+      var alamat = escapeHtml((data && data.alamat) || "-");
+      MailApp.sendEmail({
+        to: ADMIN_EMAIL,
+        subject: "IMKKSA — Pendaftaran Anggota Baru: " + nama,
+        htmlBody: "<p>Ada <b>pendaftaran anggota baru</b> yang menunggu verifikasi di situs IMKKSA KARO:</p>" +
+                  "<ul>" +
+                  "<li><b>Nama:</b> " + nama + "</li>" +
+                  "<li><b>No. HP:</b> " + noHp + "</li>" +
+                  "<li><b>Alamat:</b> " + alamat + "</li>" +
+                  "</ul>" +
+                  "<p>Login ke panel admin → <b>Data Anggota</b> → Antrean Persetujuan untuk <b>Approve</b> atau <b>Tolak</b>.</p>"
+      });
+      return ContentService.createTextOutput(JSON.stringify({ success: true }))
                            .setMimeType(ContentService.MimeType.JSON);
     }
     

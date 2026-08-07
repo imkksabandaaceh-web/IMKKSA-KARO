@@ -974,6 +974,21 @@ function App() {
     try {
       await umatService.upsert([pendingRecord]);
       setUserSubmitMessage('Data berhasil dikirim! Menunggu verifikasi Admin.');
+
+      // Notifikasi email ke admin (fire-and-forget, tidak mengganggu alur pengguna)
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action: 'kirimNotifikasiPendaftaran',
+            data: { id: pendingRecord.id, nama: pendingRecord.nama, noHp: pendingRecord.noHp || '', alamat: pendingRecord.alamat || '' }
+          })
+        });
+      } catch (err) {
+        console.error('Gagal kirim notifikasi admin:', err);
+      }
     } catch {
       setUserSubmitMessage('Gagal terkirim ke server. Data tersimpan lokal, silakan coba lagi nanti.');
     } finally {

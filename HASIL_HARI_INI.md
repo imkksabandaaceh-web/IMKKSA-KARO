@@ -118,6 +118,29 @@ create table if not exists public.umat (
 
 ---
 
+## ✅ Fase 4 — Notifikasi Email Pendaftaran Baru (commit berikutnya)
+
+> Follow-up: admin diberi tahu lewat email setiap kali ada pendaftaran mandiri masuk antrean.
+
+### 4.1 Backend (`Code.js`, deploy Apps Script v5 → v6)
+- Aksi baru `kirimNotifikasiPendaftaran` di `doPost`:
+  - Mengirim email ke **`ADMIN_EMAIL`** (`imkksabandaaceh@gmail.com`) berisi nama, No. HP, dan alamat pengaju.
+  - **Proteksi spam:** setiap id hanya boleh memicu 1 email dalam 6 jam (via `CacheService`).
+  - Hanya menerima id berawalan `pending_`.
+- `appsscript.json`: tambah `oauthScopes` (`drive` + `script.send_mail`) — **wajib diotorisasi sekali oleh pemilik script**.
+
+### 4.2 Frontend (`src/App.tsx`)
+- Setelah pendaftaran publik berhasil tersimpan ke Supabase → panggilan fire-and-forget ke
+  Apps Script (`mode: 'no-cors'`, tidak mengganggu alur pengguna) untuk memicu email admin.
+
+### 4.3 Hasil verifikasi
+- Endpoint live v6 sudah mengeksekusi aksi baru (terbukti dari respons server).
+- Email belum terkirim sampai **owner mengotorisasi scope `script.send_mail`** (sekali saja, 30 detik).
+- **RLS diuji ulang menyeluruh:** insert anon `is_pending=true` → 201 (diterima) dalam semua
+  variasi kolom; anon `select` hanya melihat anggota disetujui; anon `delete` → 0 baris (diblokir RLS).
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -133,17 +156,20 @@ create table if not exists public.umat (
 
 | Deployment | Versi | Isi |
 |---|---|---|
-| `AKfycbyaEatvxMhJfw...` (URL situs, tidak berubah) | **v3** → **v4** | Folder anggota + bersihkan umat |
+| `AKfycbyaEatvxMhJfw...` (URL situs, tidak berubah) | **v3** → **v4** → **v5** → **v6** | Folder anggota + bersihkan umat + notifikasi email + scope MailApp |
 
 ---
 
-## 📌 Catatan / Langkah yang masih bisa dilakukan
+## 📌 Langkah yang Tersisa (diperlukan user)
 
-1. **Hapus data uji** `Test Pendaftaran Publik` (baris `test_pending_verif`) → login admin →
-   Data Anggota → **Antrean Persetujuan** → klik **Tolak** (sekaligus menguji panel baru).
-2. **Notifikasi admin** saat ada pendaftaran baru (email via Apps Script `MailApp`) — direncanakan
-   sebagai langkah lanjutan.
+1. **Otorisasi scope MailApp (wajib, sekali saja):** buka Apps Script editor (project IMKKSA) →
+   otorisasi ulang → izinkan. Setelah ini, email notifikasi berfungsi. Tanpa ini, semua aksi
+   Apps Script akan gagal dengan error izin.
+2. **Bersihkan baris uji antrean** (±5 baris: *Uji Verifikasi*, *Uji Map 1*, *Uji A/B/C*) →
+   login admin → Data Anggota → **Antrean Persetujuan** → klik **Tolak** untuk masing-masing
+   (sekaligus menguji panel baru).
 3. Opsional: WhatsApp notification (perlu Meta Business verification) jika diinginkan.
+4. Opsional: email notifikasi juga bisa dikirim saat admin login menemukan antrean baru.
 
 ---
 
@@ -154,5 +180,6 @@ create table if not exists public.umat (
 56ea9b3  Fase 2: migrasi data anggota ke Supabase (baca/tulis langsung, migrasi 1x, fix baris ganda)
 5382c24  Lindungi cache lokal umat agar tidak tertimpa kosong sebelum migrasi
 265e2d4  Code.js: hapus umat dari Apps Script, respons polling lebih ringan
-<latest> Panel admin approve/reject + dokumen ini
+5f682e2  Panel admin approve/reject + dokumen ini
+<latest> Notifikasi email pendaftaran baru + scope MailApp
 ```
