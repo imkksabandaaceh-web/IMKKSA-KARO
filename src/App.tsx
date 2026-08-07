@@ -593,6 +593,11 @@ function App() {
       } else {
         const approved = await umatService.fetchApproved('')
         setSiteContent(prev => {
+          // Lindungi cache lokal: jangan timpa data lama dengan [] saat Supabase
+          // masih kosong (mis. migrasi belum dijalankan oleh admin).
+          if (approved.length === 0 && (prev.umat || []).length > 0) {
+            return prev
+          }
           const next = { ...prev, umat: approved }
           localStorage.setItem('imkksaSiteContent', JSON.stringify(next))
           return next
