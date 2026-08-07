@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
 import APanel from './components/APanel'
@@ -8,6 +8,7 @@ import AlbumGallery from './components/GaleriView'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { umatService } from './services/umat'
 
 const compressImage = (base64: string, maxWidth: number, quality: number): Promise<string> => {
   return new Promise((resolve) => {
@@ -322,6 +323,32 @@ const DEFAULT_CONTENT: FullContent = {
   galeriAlbum: []
 };
 
+// ── Helper: baca file jadi base64 & upload ke Google Drive ──
+// (dipakai di handleFileChange dan saat migrasi data lama)
+const readFileAsBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+const uploadBase64ToDrive = async (base64: string, folder?: string): Promise<string> => {
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      action: 'uploadImage',
+      data: { base64, ...(folder ? { folder } : {}) }
+    })
+  });
+  const result = await res.json();
+  if (result.success && result.url) return result.url;
+  throw new Error(result.error || 'Upload gagal, tidak ada URL yang dikembalikan.');
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('Beranda')
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false)
@@ -462,7 +489,8 @@ function App() {
             ...prev,
             settings: data.settings ? { ...DEFAULT_CONTENT.settings, ...data.settings } : prev.settings,
             pages: data.pages ? { ...DEFAULT_CONTENT.pages, ...migratedPages } : prev.pages,
-            umat: data.umat !== undefined ? data.umat : prev.umat,
+            // umat kini sumber datanya Supabase (dikelola loadUmat terpisah)
+            umat: prev.umat,
             pengurus: currentParsedPengurus,
             galeri: data.galeri || prev.galeri || [],
             galeriAlbum: data.galeriAlbum || prev.galeriAlbum || []
@@ -498,6 +526,89 @@ function App() {
     isLoggedInRef.current = isLoggedIn
   }, [isLoggedIn])
 
+  // ── Data anggota (umat) — sumber utama: Supabase ──
+  // siteContentRef dipakai agar loadUmat bisa membaca data terbaru tanpa
+  // perlu di-recreate tiap render.
+  const siteContentRef = useRef(siteContent)
+  useEffect(() => {
+    siteContentRef.current = siteContent
+  }, [siteContent])
+
+  // Muat data anggota dari Supabase:
+  //  - Admin → semua baris (termasuk pending, NIK, KK)
+  //  - Publik → hanya yang disetujui, tanpa NIK/KK
+  //  - Jika Supabase masih kosong & ada data lama di Apps Script/localStorage
+  //    → migrasi SEKALI ke Supabase (termasuk upload base64 yang tersisa ke Drive)
+  const loadUmat = useCallback(async (opts: { silent?: boolean } = {}) => {
+    try {
+      if (isLoggedInRef.current) {
+        const all = await umatService.fetchAll()
+        if (all.length > 0) {
+          setSiteContent(prev => {
+            const next = { ...prev, umat: all }
+            localStorage.setItem('imkksaSiteContent', JSON.stringify(next))
+            return next
+          })
+          return
+        }
+
+        // Supabase masih kosong → ambil data lama dari localStorage/Apps Script
+        let existing = [...(siteContentRef.current.umat || [])]
+        if (existing.length === 0) {
+          try {
+            const res = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, { method: 'GET', mode: 'cors', redirect: 'follow' })
+            const text = await res.text()
+            const data = JSON.parse(text.replace(/^\uFEFF/, '').trim())
+            if (Array.isArray(data.umat)) existing = data.umat
+          } catch (e) {
+            console.error('Gagal mengambil data lama dari Apps Script:', e)
+          }
+        }
+
+        if (existing.length > 0) {
+          // Bersihkan base64 yang tersisa → upload ke Drive, simpan URL-nya
+          const cleaned: UmatRecord[] = []
+          for (const u of existing) {
+            let photo = u.photo
+            let kk = u.kk
+            if (photo && photo.startsWith('data:')) {
+              try { photo = await uploadBase64ToDrive(photo, 'IMKKSA_Anggota_Dokumen') } catch (e) { console.error('Gagal migrasi foto:', e) }
+            }
+            if (kk && kk.startsWith('data:')) {
+              try { kk = await uploadBase64ToDrive(kk, 'IMKKSA_Anggota_Dokumen') } catch (e) { console.error('Gagal migrasi KK:', e) }
+            }
+            cleaned.push({ ...u, photo, kk })
+          }
+          await umatService.upsert(cleaned)
+          const fresh = await umatService.fetchAll()
+          if (fresh.length > 0) {
+            setSiteContent(prev => {
+              const next = { ...prev, umat: fresh }
+              localStorage.setItem('imkksaSiteContent', JSON.stringify(next))
+              return next
+            })
+            alert('✅ Data anggota lama berhasil dimigrasikan ke Supabase!')
+          }
+        }
+      } else {
+        const approved = await umatService.fetchApproved('')
+        setSiteContent(prev => {
+          const next = { ...prev, umat: approved }
+          localStorage.setItem('imkksaSiteContent', JSON.stringify(next))
+          return next
+        })
+      }
+    } catch (err) {
+      if (!opts.silent) console.error('Gagal memuat data anggota dari Supabase:', err)
+    }
+  }, [])
+
+  // Muat ulang umat dari Supabase saat halaman dibuka & saat status login berubah.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pemuatan data async via fetch (pola fetch-on-mount standar React)
+    loadUmat()
+  }, [loadUmat, isLoggedIn])
+
   // Pengambilan data: sekali saat halaman dibuka + refresh saat tab kembali aktif.
   // Polling berkala (60 detik, bukan 15 detik) HANYA untuk admin yang sedang login
   // dan HANYA saat tab terlihat → kuota Apps Script hemat & situs tetap cepat
@@ -525,6 +636,7 @@ function App() {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         fetchData(true) // segarkan data segera saat kembali ke tab
+        loadUmat({ silent: true }) // segarkan juga data anggota dari Supabase
         startPolling()
       } else {
         stopPolling()
@@ -729,21 +841,27 @@ function App() {
     }
 
     let newUmatList = [...siteContent.umat];
+    let changedRecord: UmatRecord;
     if (editingId) {
       // Edit mode: replace the existing record
-      newUmatList = newUmatList.map(u => 
-        u.id === editingId ? { ...u, ...umatForm, isPending: false } : u
+      changedRecord = { ...umatForm, id: editingId, isPending: false };
+      newUmatList = newUmatList.map(u =>
+        u.id === editingId ? changedRecord : u
       );
     } else {
       // Add mode: check if name already exists to avoid duplication
-      const nameExists = newUmatList.some(u => !u.isPending && u.nama.toLowerCase() === umatForm.nama.trim().toLowerCase());
-      if (nameExists) {
+      const existingRecord = newUmatList.find(u => !u.isPending && u.nama.toLowerCase() === umatForm.nama.trim().toLowerCase());
+      if (existingRecord) {
         if (!window.confirm(`Anggota dengan nama "${umatForm.nama}" sudah ada. Apakah Anda ingin memperbarui datanya?`)) {
           return;
         }
-        newUmatList = newUmatList.filter(u => u.nama.toLowerCase() !== umatForm.nama.trim().toLowerCase());
+        newUmatList = newUmatList.filter(u => u.id !== existingRecord.id);
+        // Update-in-place: pakai id record lama supaya tidak meninggalkan baris ganda di Supabase
+        changedRecord = { ...umatForm, id: existingRecord.id, isPending: false };
+      } else {
+        changedRecord = { ...umatForm, id: Date.now().toString(), isPending: false };
       }
-      newUmatList.push({ ...umatForm, id: Date.now().toString(), isPending: false });
+      newUmatList.push(changedRecord);
     }
 
     const newContent = { ...siteContent, umat: newUmatList }
@@ -751,16 +869,12 @@ function App() {
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent))
 
     try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
-      })
-      alert('Data Anggota Berhasil Disimpan!')
+      // Simpan langsung ke Supabase (hanya record yang berubah → payload kecil & cepat)
+      await umatService.upsert([changedRecord])
+      alert('Data Anggota Berhasil Disimpan ke Supabase!')
     } catch (error) {
-      console.error("Gagal sinkron data anggota:", error)
-      alert('Gagal menyinkronkan data ke Google Drive.')
+      console.error("Gagal simpan data anggota ke Supabase:", error)
+      alert('Gagal menyimpan ke Supabase: ' + (error instanceof Error ? error.message : String(error)))
     }
     setUmatForm({ nama: '', status: 'Anggota', nik: '', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' })
     setEditingId(null)
@@ -776,12 +890,7 @@ function App() {
       localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
       try {
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
-        });
+        await umatService.remove(id);
         alert('Data Anggota Berhasil Dihapus!');
       } catch (error) {
         console.error("Gagal menghapus data anggota:", error);
@@ -796,7 +905,9 @@ function App() {
   }
 
   const handleApproveUmat = async (umat: UmatRecord) => {
-    const cleanList = siteContent.umat.filter(u => u.id !== umat.id && u.nama.toLowerCase() !== umat.nama.toLowerCase());
+    // Hapus hanya yang id-nya sama (jangan filter by nama agar tidak memengaruhi
+    // orang berbeda yang kebetulan bernama sama / meninggalkan baris ganda).
+    const cleanList = siteContent.umat.filter(u => u.id !== umat.id);
     const officialUmat = { ...umat, isPending: false };
     const newUmatList = [...cleanList, officialUmat];
 
@@ -805,12 +916,7 @@ function App() {
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
     try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
-      })
+      await umatService.upsert([officialUmat])
       alert('Data Anggota Berhasil Disetujui!')
     } catch (error) {
       console.error("Gagal approve data anggota:", error)
@@ -825,12 +931,7 @@ function App() {
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
     try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateUmat', data: newUmatList }),
-      });
+      await umatService.remove(id);
       alert('Pendaftaran berhasil ditolak/dihapus.');
     } catch (error) {
       console.error("Gagal sinkron tolak data:", error);
@@ -859,15 +960,10 @@ function App() {
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
     try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateUmat', data: newContent.umat }),
-      });
+      await umatService.upsert([pendingRecord]);
       setUserSubmitMessage('Data berhasil dikirim! Menunggu verifikasi Admin.');
     } catch {
-      setUserSubmitMessage('Data tersimpan lokal. Sinkronisasi akan dicoba ulang.');
+      setUserSubmitMessage('Gagal terkirim ke server. Data tersimpan lokal, silakan coba lagi nanti.');
     } finally {
       setIsSubmittingUserForm(false);
       setShowUserForm(false);
@@ -1262,30 +1358,6 @@ function App() {
   // Simpan ditekan). Form hanya menyimpan URL-nya, sehingga payload simpan kecil,
   // cepat, dan tidak lagi mengirim base64 besar lewat Apps Script (mencegah
   // timeout 6 menit & melebihi batas Script Properties 500KB).
-  const readFileAsBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const uploadBase64ToDrive = async (base64: string, folder?: string): Promise<string> => {
-    const res = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'uploadImage',
-        data: { base64, ...(folder ? { folder } : {}) }
-      })
-    });
-    const result = await res.json();
-    if (result.success && result.url) return result.url;
-    throw new Error(result.error || 'Upload gagal, tidak ada URL yang dikembalikan.');
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'kk', isAdmin = true) => {
     const file = e.target.files?.[0];
     if (!file) return;

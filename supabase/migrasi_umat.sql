@@ -52,3 +52,13 @@ create extension if not exists pg_trgm;
 create index if not exists umat_nama_trgm_idx on public.umat using gin (nama gin_trgm_ops);
 create index if not exists umat_is_pending_idx on public.umat (is_pending);
 create index if not exists umat_status_idx on public.umat (status);
+
+-- 4) PENDAFTARAN PUBLIK (form "Daftar Anggota" di situs)
+--    Pengunjung (anonim) boleh MENAMBAH data baru, TAPI hanya yang berstatus
+--    pending (is_pending = true) — harus diverifikasi admin dulu.
+--    Catatan: jika Anda sudah menjalankan versi sebelumnya, cukup jalankan
+--    bagian ini saja.
+drop policy if exists "Publik daftar anggota (pending)" on public.umat;
+create policy "Publik daftar anggota (pending)"
+  on public.umat for insert
+  with check (is_pending = true);
