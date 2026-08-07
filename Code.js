@@ -89,7 +89,8 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({ success: true }))
                            .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "updateUmat") {
-      saveUmatData(data);
+      // Data anggota (umat) kini disimpan di Supabase, bukan lagi di Apps Script.
+      // Handler dipertahankan hanya untuk kompatibilitas dengan cache frontend lama.
       return ContentService.createTextOutput(JSON.stringify({ success: true }))
                            .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "updateGaleriAlbum") {
@@ -165,7 +166,6 @@ function getLargeProperty(key, defaultValue) {
 function getSiteData() {
   var settings = {"logo": "/LOGO_KARO.jpg", "title": "IMKKSA Banda Aceh Sekitar"};
   var pages = {};
-  var umat = [];
   var pengurus = [];
   var galeriAlbum = [];
   
@@ -205,13 +205,6 @@ function getSiteData() {
   }
   
   try {
-    var umatStr = getLargeProperty("umat", null);
-    if (umatStr) umat = JSON.parse(umatStr);
-  } catch (e) {
-    Logger.log("Error parsing umat: " + e.toString());
-  }
-  
-  try {
     var pengurusStr = getLargeProperty("pengurus", null);
     if (pengurusStr) pengurus = JSON.parse(pengurusStr);
   } catch (e) {
@@ -228,7 +221,6 @@ function getSiteData() {
   return {
     settings: settings,
     pages: pages,
-    umat: umat,
     pengurus: pengurus,
     galeriAlbum: galeriAlbum
   };
@@ -304,52 +296,7 @@ function testGoogleDrive() {
   }
 }
 
-function saveUmatData(umatList) {
-  if (!umatList) {
-    Logger.log("saveUmatData dipanggil tanpa parameter (umatList kosong).");
-    return;
-  }
-  var folder = getOrCreateFolder("IMKKSA_Anggota_Dokumen");
-  
-  for (var i = 0; i < umatList.length; i++) {
-    var umat = umatList[i];
-    
-    if (folder) {
-      // Upload photo if it's base64 data
-      if (umat.photo && umat.photo.indexOf("data:") === 0) {
-        var fileName = "PHOTO_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
-        var uploadResult = uploadBase64ToFolder(umat.photo, fileName, folder);
-        if (uploadResult.success) {
-          umat.photo = uploadResult.url;
-        }
-      }
-      
-      // Upload KK if it's base64 data
-      if (umat.kk && umat.kk.indexOf("data:") === 0) {
-        var fileName = "KK_" + umat.nama.replace(/[^a-zA-Z0-9]/g, "_") + "_" + Date.now();
-        var uploadResult = uploadBase64ToFolder(umat.kk, fileName, folder);
-        if (uploadResult.success) {
-          umat.kk = uploadResult.url;
-        }
-      }
-    }
-  }
-  
-  try {
-    setLargeProperty("umat", JSON.stringify(umatList));
-  } catch (propErr) {
-    Logger.log("Gagal menyimpan data umat lengkap, membersihkan base64: " + propErr.toString());
-    for (var i = 0; i < umatList.length; i++) {
-      if (umatList[i].photo && umatList[i].photo.indexOf("data:") === 0) {
-        umatList[i].photo = "";
-      }
-      if (umatList[i].kk && umatList[i].kk.indexOf("data:") === 0) {
-        umatList[i].kk = "";
-      }
-    }
-    setLargeProperty("umat", JSON.stringify(umatList));
-  }
-}
+
 
 function saveGaleriAlbumData(albumList) {
   setLargeProperty("galeriAlbum", JSON.stringify(albumList));
