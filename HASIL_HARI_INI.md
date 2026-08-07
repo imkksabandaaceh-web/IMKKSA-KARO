@@ -161,8 +161,9 @@ create table if not exists public.umat (
 
 | Deployment | Versi | Isi |
 |---|---|---|
-| `AKfycbweKv2UIvRo7nDs...` (**URL SITUS BARU**) | **v9** | Folder anggota + bersihkan umat + notifikasi email + scope MailApp (dibuat via UI agar ter-otorisasi) |
-| `AKfycbyaEatvxMhJfw...` (URL lama, tak terpakai) | v3 → v8 | Deployment lama sebelum migrasi URL |
+| `AKfycbweKv2UIvRo7nDs...` (**URL SITUS AKTIF**) | **v9** | Folder anggota + bersihkan umat + notifikasi email + scope MailApp (dibuat via UI agar ter-otorisasi) |
+| `AKfycbwNFgAKXmoc0R...` (@HEAD) | HEAD | Deployment pengembangan (dev) |
+| ~~`AKfycbyaEatvxMhJfw...`~~ | ~~v8~~ | ~~Deployment lama~~ — **sudah dihapus** (28/07/2026, setelah situs live terbukti memakai URL baru) |
 
 ---
 
