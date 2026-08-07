@@ -849,7 +849,14 @@ function App() {
     let changedRecord: UmatRecord;
     if (editingId) {
       // Edit mode: replace the existing record
-      changedRecord = { ...umatForm, id: editingId, isPending: false };
+      // Jika record asli masih pending, tanyakan dulu apakah simpan ini sekaligus menyetujui
+      // (hindari auto-approve diam-diam saat mengedit data antrean verifikasi).
+      const wasPending = !!siteContent.umat.find(u => u.id === editingId)?.isPending;
+      let approveNow = !wasPending;
+      if (wasPending) {
+        approveNow = window.confirm('Data ini masih berstatus menunggu verifikasi. Klik OK untuk menyimpan sekaligus menyetujui (langsung tampil di daftar anggota), atau Batal agar tetap berada di antrean persetujuan.');
+      }
+      changedRecord = { ...umatForm, id: editingId, isPending: !approveNow };
       newUmatList = newUmatList.map(u =>
         u.id === editingId ? changedRecord : u
       );
@@ -1651,6 +1658,16 @@ function App() {
               </div>
             </div>
             
+            {pendingUmat.length > 0 && (
+              <div className="pending-banner" onClick={() => document.getElementById('pending-queue')?.scrollIntoView({ behavior: 'smooth' })}>
+                <div>
+                  <strong>⚠️ {pendingUmat.length} pendaftaran baru menunggu persetujuan</strong>
+                  <div style={{ fontSize: '0.82rem', marginTop: '2px' }}>Periksa dokumen lalu Approve / Tolak di bagian Antrean Persetujuan di bawah.</div>
+                </div>
+                <button className="btn-edit-small" style={{ background: '#fff8e1', color: '#856404', border: '1px solid #ffeeba', whiteSpace: 'nowrap' }}>Lihat Antrean ↓</button>
+              </div>
+            )}
+
             <div className="admin-umat-list" style={{ marginTop: '40px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
                 <h3>Daftar Anggota Resmi ({approvedUmat.length})</h3>
@@ -1715,31 +1732,59 @@ function App() {
             </div>
 
             {pendingUmat.length > 0 && (
-              <div className="admin-umat-list" style={{ marginTop: '30px' }}>
-                <h3>Antrean Persetujuan Mandiri ({pendingUmat.length})</h3>
+              <div id="pending-queue" className="admin-umat-list" style={{ marginTop: '30px' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  ⏳ Antrean Persetujuan Mandiri
+                  <span className="badge-status badge-pending-new" style={{ fontSize: '0.8rem' }}>{pendingUmat.length} menunggu</span>
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#888', margin: '6px 0 14px' }}>
+                  Periksa foto &amp; Kartu Keluarga pengaju (klik untuk lihat detail), lalu pilih <strong>Approve</strong> agar data tampil di daftar anggota, atau <strong>Tolak</strong> untuk menghapus pendaftaran.
+                </p>
                 <div className="table-responsive">
                   <table className="umat-table admin-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '60px' }}>No</th>
-                        <th>Nama</th>
-                        <th>Status Pengajuan</th>
-                        <th style={{ width: '250px' }}>Aksi</th>
+                        <th style={{ width: '50px' }}>No</th>
+                        <th>Nama &amp; Kontak</th>
+                        <th>Dokumen</th>
+                        <th>Diajukan</th>
+                        <th>Status</th>
+                        <th style={{ width: '265px' }}>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
                       {pendingUmat.map((u, idx) => (
                         <tr key={u.id}>
                           <td>{idx + 1}</td>
-                          <td style={{ fontWeight: '600' }}>{u.nama}</td>
+                          <td>
+                            <div style={{ fontWeight: '600' }}>{u.nama}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#777' }}>
+                              {u.noHp ? `📱 ${u.noHp}` : ''}
+                              {u.nik ? ` · NIK ••••${u.nik.length <= 4 ? u.nik : u.nik.slice(-4)}` : ''}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="pending-docs">
+                              {u.photo ? (
+                                <img src={toImageKitUrl(u.photo, 200, true)} alt="Pas Foto" className="doc-thumb" title="Pas Foto — klik untuk detail" onClick={() => setSelectedUmat(u)} />
+                              ) : <span className="doc-none">Tanpa foto</span>}
+                              {u.kk ? (
+                                <img src={toImageKitUrl(u.kk, 300)} alt="Kartu Keluarga" className="doc-thumb doc-thumb-kk" title="Kartu Keluarga — klik untuk detail" onClick={() => setSelectedUmat(u)} />
+                              ) : null}
+                            </div>
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', color: '#555' }}>
+                            {getUmatTimestamp(u) > 0 ? formatDateDevice(new Date(getUmatTimestamp(u)).toISOString()) : '-'}
+                          </td>
                           <td>
                             <span className="badge-status badge-pending-new">Menunggu Verifikasi</span>
                           </td>
                           <td>
                             <div className="table-actions">
-                              <button className="btn-save" style={{ padding: '6px 12px', fontSize: '0.75rem', textTransform: 'none' }} onClick={() => handleApproveUmat(u)}>Approve</button>
+                              <button className="btn-edit-small" onClick={() => setSelectedUmat(u)} style={{ background: '#e3f2fd', color: '#0d47a1', border: '1px solid #bbdefb' }}>Detail</button>
+                              <button className="btn-save" style={{ padding: '6px 12px', fontSize: '0.75rem', textTransform: 'none' }} onClick={() => handleApproveUmat(u)}>✔ Approve</button>
                               <button className="btn-edit-small" onClick={() => { setUmatForm({ nama: u.nama, status: u.status || 'Anggota', nik: u.nik, alamat: u.alamat, noHp: u.noHp, photo: u.photo, kk: u.kk, tempatLahir: u.tempatLahir || '', tanggalLahir: u.tanggalLahir || '' }); setEditingId(u.id); setKkMode('upload'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
-                              <button className="btn-delete-small" onClick={() => handleRejectUmat(u.id)}>Tolak</button>
+                              <button className="btn-delete-small" onClick={() => handleRejectUmat(u.id)}>✕ Tolak</button>
                             </div>
                           </td>
                         </tr>

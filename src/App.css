@@ -1262,3 +1262,64 @@ button {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
+
+/* --- Antrean persetujuan admin: thumbnail dokumen --- */
+.pending-docs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-thumb {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.doc-thumb-kk {
+  width: 58px;
+  height: 42px;
+  object-fit: cover;
+}
+.doc-thumb:hover {
+  transform: scale(1.6);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+  z-index: 3;
+  position: relative;
+}
+.doc-none {
+  font-size: 0.72rem;
+  color: #999;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+/* --- Banner notifikasi antrean persetujuan --- */
+.pending-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, #fff8e1, #fff3cd);
+  border: 1px solid #ffeeba;
+  border-left: 5px solid #f0ad4e;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  animation: bannerPulse 2s ease-in-out infinite;
+}
+.pending-banner:hover {
+  box-shadow: 0 6px 16px rgba(240, 173, 78, 0.35);
+  transform: translateY(-1px);
+}
+@keyframes bannerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 173, 78, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(240, 173, 78, 0); }
+}
