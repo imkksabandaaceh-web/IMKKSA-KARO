@@ -1244,3 +1244,21 @@ button {
   }
 }
 
+
+/* Status unggahan foto/KK ke Google Drive (form anggota) */
+.upload-status {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: #e65100;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: inline-block;
+  animation: uploadPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes uploadPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}

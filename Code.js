@@ -97,7 +97,10 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({ success: true }))
                            .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "uploadImage") {
-      var folder = getOrCreateFolder("IMKKSA_Beranda_Images");
+      // folderName opsional dari frontend (mis. "IMKKSA_Anggota_Dokumen" untuk
+      // foto/KK anggota). Backward-compatible: default tetap folder lama.
+      var folderName = (data && data.folder) || "IMKKSA_Beranda_Images";
+      var folder = getOrCreateFolder(folderName);
       if (!folder) throw new Error("Gagal mengakses folder Google Drive");
       var fileName = "IMG_" + Date.now();
       var uploadResult = uploadBase64ToFolder(data.base64, fileName, folder);

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import LoginForm from './components/LoginForm'
 import AdminDashboard from './components/AdminDashboard'
 import APanel from './components/APanel'
@@ -413,6 +413,8 @@ function App() {
   const [userSubmitMessage, setUserSubmitMessage] = useState<string | null>(null)
   const [isSubmittingUserForm, setIsSubmittingUserForm] = useState(false)
   const [selectedUmat, setSelectedUmat] = useState<UmatRecord | null>(null)
+  // Field foto/KK yang sedang diunggah ke Google Drive (form admin atau publik)
+  const [uploadingField, setUploadingField] = useState<null | { form: 'admin' | 'user'; field: 'photo' | 'kk' }>(null)
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   useEffect(() => {
@@ -490,10 +492,52 @@ function App() {
     }
   }
 
+  // Ref agar polling bisa membaca status login terbaru tanpa restart effect
+  const isLoggedInRef = useRef(isLoggedIn)
+  useEffect(() => {
+    isLoggedInRef.current = isLoggedIn
+  }, [isLoggedIn])
+
+  // Pengambilan data: sekali saat halaman dibuka + refresh saat tab kembali aktif.
+  // Polling berkala (60 detik, bukan 15 detik) HANYA untuk admin yang sedang login
+  // dan HANYA saat tab terlihat → kuota Apps Script hemat & situs tetap cepat
+  // meski data anggota (umat) sudah 60+ keluarga.
   useEffect(() => {
     fetchData()
-    const interval = setInterval(() => fetchData(true), 15000)
-    return () => clearInterval(interval)
+
+    const POLL_INTERVAL_MS = 60000
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    const startPolling = () => {
+      if (intervalId !== null) return
+      intervalId = setInterval(() => {
+        if (document.visibilityState === 'visible' && isLoggedInRef.current) {
+          fetchData(true)
+        }
+      }, POLL_INTERVAL_MS)
+    }
+    const stopPolling = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData(true) // segarkan data segera saat kembali ke tab
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    if (document.visibilityState === 'visible') startPolling()
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   useEffect(() => {
@@ -1214,24 +1258,65 @@ function App() {
     )
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'kk', isAdmin = true) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Ukuran file tidak boleh lebih dari 5 MB");
-        return;
-      }
+  // Upload foto/KK LANGSUNG ke Google Drive saat file dipilih (bukan saat tombol
+  // Simpan ditekan). Form hanya menyimpan URL-nya, sehingga payload simpan kecil,
+  // cepat, dan tidak lagi mengirim base64 besar lewat Apps Script (mencegah
+  // timeout 6 menit & melebihi batas Script Properties 500KB).
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        const compressed = await compressImage(base64, 800, 0.6);
-        if (isAdmin) {
-          setUmatForm(prev => ({ ...prev, [field]: compressed }));
-        } else {
-          setUserUmatForm(prev => ({ ...prev, [field]: compressed }));
-        }
-      };
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  };
+
+  const uploadBase64ToDrive = async (base64: string, folder?: string): Promise<string> => {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'uploadImage',
+        data: { base64, ...(folder ? { folder } : {}) }
+      })
+    });
+    const result = await res.json();
+    if (result.success && result.url) return result.url;
+    throw new Error(result.error || 'Upload gagal, tidak ada URL yang dikembalikan.');
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'kk', isAdmin = true) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran file tidak boleh lebih dari 5 MB");
+      e.target.value = '';
+      return;
+    }
+
+    const formKey = isAdmin ? 'admin' : 'user';
+    if (uploadingField?.form === formKey && uploadingField?.field === field) return;
+    setUploadingField({ form: formKey, field });
+
+    try {
+      const base64 = await readFileAsBase64(file);
+      // Pas foto cukup 500px; KK perlu lebih besar supaya tetap terbaca jelas.
+      const maxWidth = field === 'kk' ? 800 : 500;
+      const compressed = await compressImage(base64, maxWidth, 0.6);
+      const url = await uploadBase64ToDrive(compressed, 'IMKKSA_Anggota_Dokumen');
+      if (isAdmin) {
+        setUmatForm(prev => ({ ...prev, [field]: url }));
+      } else {
+        setUserUmatForm(prev => ({ ...prev, [field]: url }));
+      }
+    } catch (err) {
+      console.error(`Gagal unggah ${field}:`, err);
+      const label = field === 'photo' ? 'Pas Foto' : 'Kartu Keluarga';
+      alert(`Gagal mengunggah ${label} ke Google Drive: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUploadingField(null);
+      e.target.value = '';
     }
   }
 
@@ -1380,7 +1465,12 @@ function App() {
                 </div>
                 <div className="form-group">
                   <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'photo', true)} />
+                  <>
+                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'photo', true)} disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'photo'} />
+                    {uploadingField?.form === 'admin' && uploadingField?.field === 'photo' && (
+                      <div className="upload-status">⏳ Mengunggah pas foto ke Google Drive...</div>
+                    )}
+                  </>
                   {umatForm.photo && (
                     <div className="preview-container">
                       <img
@@ -1411,7 +1501,12 @@ function App() {
                   </div>
 
                   {kkMode === 'upload' && (
-                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'kk', true)} />
+                    <>
+                      <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'kk', true)} disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'kk'} />
+                      {uploadingField?.form === 'admin' && uploadingField?.field === 'kk' && (
+                        <div className="upload-status">⏳ Mengunggah Kartu Keluarga ke Google Drive...</div>
+                      )}
+                    </>
                   )}
 
                   {kkMode === 'link' && (
@@ -1755,11 +1850,17 @@ function App() {
                     </div>
                     <div className="form-group">
                       <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={(e) => handleFileChange(e, 'photo', false)} 
-                      />
+                      <>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => handleFileChange(e, 'photo', false)} 
+                          disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
+                        />
+                        {uploadingField?.form === 'user' && uploadingField?.field === 'photo' && (
+                          <div className="upload-status">⏳ Mengunggah pas foto ke Google Drive...</div>
+                        )}
+                      </>
                       {userUmatForm.photo && (
                         <div className="preview-container">
                           <img
@@ -1774,11 +1875,17 @@ function App() {
                     </div>
                     <div className="form-group">
                       <label>Upload KK (Kartu Keluarga - Opsional, Maksimal 5 MB):</label>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={(e) => handleFileChange(e, 'kk', false)} 
-                      />
+                      <>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => handleFileChange(e, 'kk', false)} 
+                          disabled={uploadingField?.form === 'user' && uploadingField?.field === 'kk'}
+                        />
+                        {uploadingField?.form === 'user' && uploadingField?.field === 'kk' && (
+                          <div className="upload-status">⏳ Mengunggah Kartu Keluarga ke Google Drive...</div>
+                        )}
+                      </>
                       {userUmatForm.kk && (
                         <div className="preview-container">
                           <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
