@@ -1,13 +1,10 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import LoginForm from './components/LoginForm'
-import AdminDashboard from './components/AdminDashboard'
-import APanel from './components/APanel'
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
+const APanel = lazy(() => import('./components/APanel'))
 import './App.css'
 import AlbumGallery from './components/GaleriView'
-import * as XLSX from 'xlsx'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { umatService } from './services/umat'
 
 const compressImage = (base64: string, maxWidth: number, quality: number): Promise<string> => {
@@ -1439,11 +1436,12 @@ function App() {
       : [];
 
     // --- Export Data Anggota ke Excel (.xlsx) ---
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
       if (filteredAdminUmat.length === 0) {
         alert('Tidak ada data anggota untuk diunduh.');
         return;
       }
+      const XLSX = await import('xlsx')
       const dataToExport = filteredAdminUmat.map((u, idx) => ({
         No: idx + 1,
         'Nama Lengkap': u.nama,
@@ -1475,11 +1473,13 @@ function App() {
     };
 
     // --- Export Data Anggota ke PDF ---
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
       if (filteredAdminUmat.length === 0) {
         alert('Tidak ada data anggota untuk diunduh.');
         return;
       }
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
       doc.setFontSize(13);
@@ -2341,7 +2341,11 @@ function App() {
           )}
         </ul>
       </nav>
-      <main className="main-content">{renderPage()}</main>
+      <main className="main-content">
+        <Suspense fallback={<div className="page-content" style={{ textAlign: 'center', padding: '40px' }}>Memuat...</div>}>
+          {renderPage()}
+        </Suspense>
+      </main>
       <footer className="footer">&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</footer>
       {renderFormulirPendaftaranModal()}
     </div>
