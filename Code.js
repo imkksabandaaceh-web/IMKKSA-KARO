@@ -37,24 +37,31 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     try {
-      // Cache daftar foto di CacheService (TTL maksimum 6 jam) supaya
-      // pengunjung berikutnya (termasuk yang pertama kali buka galeri)
-      // tidak perlu menunggu iterasi DriveApp yang lambat (±2 detik).
-      // Cache bersifat global per script, jadi semua pengunjung memakainya.
+      // Cache daftar foto di CacheService (TTL 2 jam) supaya pengunjung
+      // (termasuk yang pertama kali buka galeri) tidak perlu menunggu
+      // iterasi DriveApp yang lambat. Cache bersifat global per script,
+      // jadi semua pengunjung memakainya.
+      // Parameter refresh=1 (dari tombol "Segarkan Foto") memaksa hitung
+      // ulang langsung dari Google Drive dan memperbarui cache.
       var cacheKey = 'galeri_folder_' + folderId;
       var cache = CacheService.getScriptCache();
       var files = null;
-      var cachedJson = cache.get(cacheKey);
-      if (cachedJson) {
-        try {
-          files = JSON.parse(cachedJson);
-        } catch (e) {
-          files = null; // cache rusak → hitung ulang di bawah
-        }
-      }
-      if (!files) {
+      if (params.refresh === '1') {
         files = listFolderFiles(folderId);
-        cache.put(cacheKey, JSON.stringify(files), 21600); // 6 jam
+        cache.put(cacheKey, JSON.stringify(files), 7200); // 2 jam
+      } else {
+        var cachedJson = cache.get(cacheKey);
+        if (cachedJson) {
+          try {
+            files = JSON.parse(cachedJson);
+          } catch (e) {
+            files = null; // cache rusak → hitung ulang di bawah
+          }
+        }
+        if (!files) {
+          files = listFolderFiles(folderId);
+          cache.put(cacheKey, JSON.stringify(files), 7200); // 2 jam
+        }
       }
       return ContentService
         .createTextOutput(JSON.stringify({ files: files }))

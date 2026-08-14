@@ -81,11 +81,14 @@ const fetchFolderFiles = async (
   folderId: string,
   scriptUrl: string,
   limit?: number,
-  pageToken?: string | null
+  pageToken?: string | null,
+  refresh = false
 ): Promise<FetchFilesResult> => {
   // Panggil Google Apps Script yang sudah ada (action=listFolder).
   // limit → hanya minta segini banyak foto (preview cepat).
   // pageToken → lanjutkan dari posisi terakhir, bukan dari awal folder lagi.
+  // refresh → paksa server menghitung ulang dari Drive (lewati cache 2 jam),
+  // dipakai oleh tombol "Segarkan Foto".
   const qs = new URLSearchParams({
     action: 'listFolder',
     folderId,
@@ -93,6 +96,7 @@ const fetchFolderFiles = async (
   });
   if (limit) qs.set('limit', String(limit));
   if (pageToken) qs.set('pageToken', pageToken);
+  if (refresh) qs.set('refresh', '1');
 
   const url = `${scriptUrl}?${qs.toString()}`;
   const response = await fetch(url, { method: 'GET', mode: 'cors', redirect: 'follow' });
@@ -253,6 +257,8 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
   // ── State untuk fitur "preview + Lihat Semua" ───────────────────────────
   const [expanded, setExpanded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Status tombol "Segarkan Foto" (sedang menghitung ulang dari Drive atau tidak)
+  const [refreshing, setRefreshing] = useState(false);
 
   // ── State & ref untuk membatasi tampilan ke 1 BARIS saja saat belum expanded ──
   // (jumlah foto per baris otomatis menyesuaikan lebar layar: 4, 5, atau 6 dst.)
@@ -275,10 +281,10 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
   // dari Apps Script → galeri terasa lama di HP.
   // Sekarang: daftar foto (termasuk versi preview) disimpan di localStorage
   // dengan TTL yang disamakan dengan cache server (CacheService Apps Script,
-  // 6 jam). Kunjungan berikutnya langsung menampilkan foto dari cache, lalu
+  // 2 jam). Kunjungan berikutnya langsung menampilkan foto dari cache, lalu
   // refresh di background — dan refresh itu sendiri cepat karena server juga
   // sudah menyimpan daftar foto di cache-nya.
-  const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 jam, samakan dengan CacheService server
+  const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 jam, samakan dengan CacheService server
 
   const readGaleriCache = useCallback((): { files: DriveFile[]; full: boolean; fetchedAt: number } | null => {
     try {
@@ -430,6 +436,24 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
     }
   };
 
+  // Tombol "Segarkan Foto": paksa server menghitung ulang daftar foto dari
+  // Google Drive (melewati cache server 2 jam), lalu perbarui tampilan dan
+  // cache lokal — supaya foto baru yang ditambahkan admin langsung muncul
+  // tanpa menunggu TTL cache.
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const { files, nextPageToken } = await fetchFolderFiles(folderId, scriptUrl, undefined, null, true);
+      setState({ status: 'success', files, nextPageToken });
+      saveGaleriCache(files, !nextPageToken);
+    } catch (err: any) {
+      console.error('[GaleriView] Gagal menyegarkan foto:', err);
+      alert('Gagal menyegarkan daftar foto: ' + (err?.message || err));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [folderId, scriptUrl, saveGaleriCache]);
+
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <div ref={containerRef} style={{ padding: '32px', textAlign: 'center', color: '#888' }}>
@@ -573,29 +597,49 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
         )}
       </div>
 
-      {/* Tombol "Lihat Semua Foto" / "Tampilkan Lebih Sedikit" */}
-      {showToggleButton && (
-        <div style={{ textAlign: 'center', marginTop: '10px' }}>
+      {/* Tombol "Lihat Semua Foto" / "Tampilkan Lebih Sedikit" + "Segarkan Foto" */}
+      {(state.status === 'success' && state.files.length > 0) && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+          {showToggleButton && (
+            <button
+              onClick={handleToggleClick}
+              disabled={loadingMore}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--primary-color, #2e7d32)',
+                color: 'var(--primary-color, #2e7d32)',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                padding: '6px 18px',
+                borderRadius: '20px',
+                cursor: loadingMore ? 'default' : 'pointer',
+                opacity: loadingMore ? 0.7 : 1,
+              }}
+            >
+              {loadingMore
+                ? 'Memuat semua foto...'
+                : expanded
+                  ? 'Tampilkan Lebih Sedikit ▲'
+                  : `Klik untuk Lihat Semua Foto${hasMoreOnServer ? '' : ` (${state.files.length})`} ▾`}
+            </button>
+          )}
           <button
-            onClick={handleToggleClick}
-            disabled={loadingMore}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Hitung ulang daftar foto langsung dari Google Drive (melewati cache)"
             style={{
               background: 'transparent',
-              border: '1px solid var(--primary-color, #2e7d32)',
-              color: 'var(--primary-color, #2e7d32)',
+              border: '1px solid #888',
+              color: '#555',
               fontWeight: 600,
               fontSize: '0.85rem',
               padding: '6px 18px',
               borderRadius: '20px',
-              cursor: loadingMore ? 'default' : 'pointer',
-              opacity: loadingMore ? 0.7 : 1,
+              cursor: refreshing ? 'default' : 'pointer',
+              opacity: refreshing ? 0.7 : 1,
             }}
           >
-            {loadingMore
-              ? 'Memuat semua foto...'
-              : expanded
-                ? 'Tampilkan Lebih Sedikit ▲'
-                : `Klik untuk Lihat Semua Foto${hasMoreOnServer ? '' : ` (${state.files.length})`} ▾`}
+            {refreshing ? 'Menyegarkan foto...' : '🔄 Segarkan Foto'}
           </button>
         </div>
       )}

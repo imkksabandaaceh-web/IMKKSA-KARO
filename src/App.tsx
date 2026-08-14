@@ -285,7 +285,7 @@ interface FullContent {
   galeriAlbum: GaleriAlbum[];
 }
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwToHfqmEp4uwwRcN1paBACGspk6oUcc6i5n9WGT8AIGRCBF6aJ4WnhmnO66F-idS6YUA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwQBw4FIHWE7EVvsP9nEgxYpSrlYv9RIqDPFHSkMKvzFwOP2hXGU-gun7cgIzGtCAoRhg/exec';
 
 const DEFAULT_CONTENT: FullContent = {
   settings: {
