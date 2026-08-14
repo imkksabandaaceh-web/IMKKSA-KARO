@@ -232,6 +232,58 @@ create table if not exists public.umat (
 
 ---
 
+## ✅ Fase 7 — Proposal: Template PDF Baru + Pengujian Menyeluruh (14 Agustus 2026)
+
+> Fitur **Menu Proposal** (generate PDF otomatis bernomor + riwayat Supabase) sudah ada
+> sejak commit `8993b79`. Hari ini template PDF-nya diperbarui & dinamai ulang, pemetaan
+> field dibuat otomatis, lalu **seluruh alur diuji di browser sungguhan** (termasuk login admin).
+
+### 7.1 Template COVER.pdf & ISI.pdf baru (commit `5b15393`)
+- Admin memperbarui `public/COVER.pdf` (kotak isian: **nomor surat**, **tanggal** otomatis saat generate,
+  dan **tujuan/penerima 2 baris**) serta `public/ISI.pdf` (proposal 5 halaman).
+- **Masalah ditemukan:** field form di COVER baru bernama `Text1`/`Text2`/`Text3` (bukan
+  `nomor_surat`/`tanggal_surat`/`tujuan_surat`) → kode lama akan error saat generate.
+- **Perbaikan (`src/utils/pdfUtils.ts`):** fungsi `resolveCoverFields` — utamakan nama field
+  yang dikenal, lalu **fallback otomatis berdasarkan karakteristik & posisi**:
+  - `tujuan` = field multiline (kotak besar 2 baris),
+  - `nomor` = field paling kiri, `tanggal` = field paling kanan.
+  → tahan banting jika template di-export ulang dan nama field berubah lagi.
+- **Struktur terverifikasi:** COVER 2 halaman (halaman 1 = kop + field isian, halaman 2 = isi surat
+  + tanda tangan), ISI 5 halaman → hasil gabung **7 halaman**, tanpa duplikasi konten.
+
+### 7.2 Penamaan field form di COVER.pdf (commit `18c8727`)
+- Admin lupa memberi nama kotak isian → field di-rename **langsung di file PDF**:
+  `Text1` → `tujuan_surat`, `Text2` → `nomor_surat`, `Text3` → `tanggal_surat`
+  (sama persis dengan nama yang dicari kode; `tujuan_surat` tetap multiline).
+
+### 7.3 Pengujian menyeluruh — semua lulus ✅
+| Lapisan uji | Cara | Hasil |
+|---|---|---|
+| **Logika generate** | Node + `pdftotext` (isi field, flatten, gabung) | ✅ Nomor, tanggal, penerima 2 baris terisi benar; 7 halaman |
+| **Browser tanpa login** | Chrome headless via CDP: generate+download dengan logika persis produksi | ✅ 1 file PDF valid terunduh; insert/delete riwayat via REST (HTTP 201/204) |
+| **UI lengkap + login asli** | Chrome headless: login admin → menu Proposal → isi form → klik **PROSES & GENERATE PDF** | ✅ **23/23 cek lulus** |
+
+Detail uji UI lengkap (login `imkksa01@imkksa.org`):
+- Login admin sukses → form admin Proposal muncul → form diisi (pengirim + penerima 2 baris).
+- Klik PROSES → pesan *"Proposal dibuat: 001/PROP/IMKKSA/VIII/2026"*.
+- **Download = 1 file** `Proposal_001_PROP_IMKKSA_VIII_2026.pdf`, valid (%PDF), isi lengkap.
+- **Riwayat tersimpan** di Supabase (tampil di tabel UI + row di DB) → klik 🗑️ Hapus → row hilang dari UI & DB → database kembali bersih.
+
+### 7.4 Kesimpulan arsitektur (hasil Q&A)
+- **PDF hasil generate TIDAK pernah masuk database** — dibuat **client-side** di browser
+  (template di-`fetch` dari hosting statis), lalu langsung ter-unduh ke perangkat pengguna.
+  Supabase hanya menyimpan **teks riwayat** (~200 byte/proposal).
+- Template hidup di **server hosting** (`public/` → `dist/` → Vercel), bukan di laptop →
+  situs & generate tetap berfungsi saat laptop dimatikan; laptop hanya perlu saat update template.
+- Tombol ⬇️ Unduh di riwayat **membuat ulang** PDF dari template + teks tersimpan → bisa
+  diunduh berkali-kali dari perangkat berbeda tanpa menyimpan file PDF.
+- **Penomoran surat:** `MAX(no_urut) + 1`; jika tabel `riwayat_download` kosong, nomor
+  mulai lagi dari `001`.
+- Catatan: `App.tsx` tidak me-restore sesi admin dari localStorage — status login hanya
+  benar setelah login sungguhan lewat Supabase Auth (bukan bug, perilaku bawaan).
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -240,6 +292,8 @@ create table if not exists public.umat (
 | **Foto & Kartu Keluarga** | **Google Drive** (folder `IMKKSA_Anggota_Dokumen`) | Upload langsung saat pilih file, simpan URL-nya |
 | **Halaman/settings/pengurus/galeri** | Apps Script Script Properties | Tetap, payload polling kini ringan |
 | **Login admin** | Supabase Auth | `username@imkksa.org` / email |
+| **Template PDF (cover+isi)** | **Hosting statis** (`public/` → `dist/`) | Di-fetch browser saat generate; tidak tersimpan di DB |
+| **Riwayat proposal** | **Supabase** (tabel `riwayat_download`) | Hanya teks: nomor, pengirim, penerima, tanggal, no_urut |
 
 ---
 
@@ -281,4 +335,7 @@ create table if not exists public.umat (
 c2de41f  Galeri: tombol "Segarkan Foto" (refresh=1) + TTL cache diturunkan ke 2 jam
 3577b5c  Fix: import useMemo yang hilang di App.tsx (crash halaman kosong)
 e7953b4  Aktifkan type-check di App.tsx: hapus @ts-nocheck
+8993b79  Menu Proposal: generate PDF otomatis bernomor + riwayat Supabase
+5b15393  Perbarui template PDF cover/isi + petakan field form secara otomatis
+18c8727  Beri nama field form di COVER.pdf (nomor_surat, tanggal_surat, tujuan_surat)
 ```
