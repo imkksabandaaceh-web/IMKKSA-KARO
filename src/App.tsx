@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import LoginForm from './components/LoginForm'
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
@@ -1254,10 +1253,6 @@ function App() {
   const renderGaleri = () => {
     const albumList = siteContent.galeriAlbum || [];
 
-    // Helper: URL embed iframe untuk folder Google Drive
-    const getFolderEmbedUrl = (folderId: string) =>
-      `https://drive.google.com/embeddedfolderview?id=${folderId}#grid`;
-
     return (
       <div className="page-content">
         {isLoggedIn ? (
@@ -1562,9 +1557,9 @@ function App() {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
       doc.setFontSize(13);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('DAFTAR ANGGOTA IMKKSA BANDA ACEH SEKITAR', 14, 15);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
       doc.text(`Dicetak pada: ${tanggalCetak}  |  Total Anggota: ${filteredAdminUmat.length}`, 14, 21);
