@@ -1,4 +1,4 @@
-# 📋 HASIL PEKERJAAN — IMKKSA KARO (7 Agustus 2026)
+# 📋 HASIL PEKERJAAN — IMKKSA KARO (7 & 14 Agustus 2026)
 
 > Dokumen ini merangkum **seluruh pekerjaan** yang dilakukan dalam sesi ini agar mudah
 > ditinjau ulang (misalnya dengan bantuan AI/Claude). Semua perubahan sudah di-commit
@@ -146,6 +146,44 @@ create table if not exists public.umat (
 
 ---
 
+## ✅ Fase 5 — Optimasi Galeri: Foto Cepat di HP (14 Agustus 2026)
+
+> Masalah: foto di menu Galeri **sangat lambat muncul di HP**, padahal cepat di laptop.
+> Diselesaikan dengan cache berlapis (klien + server) plus tombol segarkan manual.
+
+### 5.1 Akar masalah (hasil pengukuran langsung ke server)
+- Daftar foto tiap album diambil dari Google Apps Script (`listFolder`) → **±1,6–2,1 dtk per album** dari koneksi cepat; lebih lama lagi di HP (RTT tinggi + rantai redirect).
+- Ada **9 album**; tiap album nge-load sendiri-sendiri saat discroll (IntersectionObserver) → tiap album muncul spinner "Memuat foto..." 2–5 dtk.
+- Cache lama hanya `sessionStorage` **dan** hanya disimpan kalau list LENGKAP (setelah klik "Lihat Semua") → setiap buka halaman baru, semua album fetch ulang dari Apps Script.
+- Gambar-gambarnya sendiri **sudah cepat** (ImageKit, cache HTTP 1 tahun, thumbnail ±20 KB) — yang lambat adalah **daftar file**, bukan gambarnya.
+
+### 5.2 Perbaikan klien — cache localStorage (commit `05bf850`)
+- `src/components/GaleriView.tsx`: daftar foto tiap album (termasuk versi preview) disimpan di **localStorage** dengan TTL.
+- Kunjungan ulang → foto tampil **instan** dari cache, lalu refresh di background.
+- Kalau refresh gagal tapi masih ada cache → foto lama tetap tampil (tidak ditimpa layar error).
+
+### 5.3 Perbaikan server — CacheService (commit `05bf850`, deploy v10)
+- `Code.js` `listFolder`: hasil daftar foto disimpan di **`CacheService`** (global per script, dipakai semua pengunjung) → pengunjung pertama kali & refresh background tidak lagi menunggu iterasi DriveApp.
+- **Hasil uji A/B** (folder 34 file, median 4 putaran):
+
+  | Tanpa cache (v9) | Dengan cache (v10/v11) |
+  |---|---|
+  | ±1,85 dtk | ±1,42 dtk |
+
+- Sisa ±1,3 dtk adalah **overhead tetap Apps Script** (spin-up container + redirect) yang tidak bisa dihilangkan dengan caching.
+
+### 5.4 Tombol "Segarkan Foto" + TTL 2 jam (commit `c2de41f`, deploy v11)
+- `Code.js`: `listFolder` menerima `refresh=1` → **memaksa hitung ulang langsung dari Google Drive** dan memperbarui cache server (tidak menunggu TTL).
+- `GaleriView.tsx`: tombol **"🔄 Segarkan Foto"** per album (di samping tombol "Lihat Semua") → admin upload foto baru ke folder Drive → klik tombol → foto baru langsung muncul.
+- TTL cache server & klien diturunkan **6 jam → 2 jam** supaya foto baru juga muncul otomatis lebih cepat.
+
+### 5.5 Deployment & verifikasi
+- Apps Script: **v10 → v11** (`AKfycbwQB...AoRhg`); v9 & v10 dihapus setelah situs terbukti memakai URL baru.
+- `SCRIPT_URL` di `App.tsx` + `.env` diperbarui setiap pindah deployment; Vercel auto-deploy dari git push.
+- Bundle produksi diverifikasi (grep) memakai URL deployment terbaru; `listFolder` normal, `refresh=1`, dan content utama semuanya HTTP 200.
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -161,8 +199,10 @@ create table if not exists public.umat (
 
 | Deployment | Versi | Isi |
 |---|---|---|
-| `AKfycbweKv2UIvRo7nDs...` (**URL SITUS AKTIF**) | **v9** | Folder anggota + bersihkan umat + notifikasi email + scope MailApp (dibuat via UI agar ter-otorisasi) |
+| `AKfycbwQBw4FIHWE7EVvs...` (**URL SITUS AKTIF**) | **v11** | Cache `listFolder` (CacheService 2 jam) + `refresh=1` + tombol "Segarkan Foto" (14/08/2026) |
 | `AKfycbwNFgAKXmoc0R...` (@HEAD) | HEAD | Deployment pengembangan (dev) |
+| ~~`AKfycbwToHfqmEp4uwwRc...`~~ | ~~v10~~ | ~~Cache `listFolder` (6 jam)~~ — **sudah dihapus** (14/08/2026, setelah situs live memakai v11) |
+| ~~`AKfycbweKv2UIvRo7nDs...`~~ | ~~v9~~ | ~~Folder anggota + notifikasi email + scope MailApp~~ — **sudah dihapus** (14/08/2026, setelah situs live memakai v10) |
 | ~~`AKfycbyaEatvxMhJfw...`~~ | ~~v8~~ | ~~Deployment lama~~ — **sudah dihapus** (28/07/2026, setelah situs live terbukti memakai URL baru) |
 
 ---
@@ -189,4 +229,6 @@ create table if not exists public.umat (
 265e2d4  Code.js: hapus umat dari Apps Script, respons polling lebih ringan
 5f682e2  Panel admin approve/reject + dokumen ini
 <latest> Notifikasi email pendaftaran baru + scope MailApp
+05bf850  Optimasi galeri: cache daftar foto di localStorage + CacheService Apps Script
+c2de41f  Galeri: tombol "Segarkan Foto" (refresh=1) + TTL cache diturunkan ke 2 jam
 ```
