@@ -37,7 +37,25 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     try {
-      var files = listFolderFiles(folderId);
+      // Cache daftar foto di CacheService (TTL maksimum 6 jam) supaya
+      // pengunjung berikutnya (termasuk yang pertama kali buka galeri)
+      // tidak perlu menunggu iterasi DriveApp yang lambat (±2 detik).
+      // Cache bersifat global per script, jadi semua pengunjung memakainya.
+      var cacheKey = 'galeri_folder_' + folderId;
+      var cache = CacheService.getScriptCache();
+      var files = null;
+      var cachedJson = cache.get(cacheKey);
+      if (cachedJson) {
+        try {
+          files = JSON.parse(cachedJson);
+        } catch (e) {
+          files = null; // cache rusak → hitung ulang di bawah
+        }
+      }
+      if (!files) {
+        files = listFolderFiles(folderId);
+        cache.put(cacheKey, JSON.stringify(files), 21600); // 6 jam
+      }
       return ContentService
         .createTextOutput(JSON.stringify({ files: files }))
         .setMimeType(ContentService.MimeType.JSON);

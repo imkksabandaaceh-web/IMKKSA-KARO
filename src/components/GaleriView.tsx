@@ -267,43 +267,78 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
 
   const cacheKey = `galeri_cache_${folderId}`;
 
-  // Ambil PREVIEW foto saja (cepat), dengan cache session & retry otomatis
-  // kalau gagal (Apps Script punya batas kuota eksekusi/menit; kalau banyak
-  // album dimuat bersamaan, sebagian bisa gagal sesaat lalu berhasil kalau
-  // dicoba ulang). Cache hanya dipakai kalau sebelumnya sudah pernah dimuat
-  // LENGKAP (full), supaya tidak menyimpan potongan data yang tidak lengkap.
+  // ── Cache daftar foto album (localStorage + TTL) ─────────────────────────
+  // Daftar foto diambil dari Google Apps Script (listFolder) yang lambat
+  // (±2 detik per album, lebih lama lagi di koneksi HP). Dulu cache cuma
+  // disimpan di sessionStorage dan hanya kalau list LENGKAP (setelah klik
+  // "Lihat Semua"), jadi tiap kali buka halaman baru semua album fetch ulang
+  // dari Apps Script → galeri terasa lama di HP.
+  // Sekarang: daftar foto (termasuk versi preview) disimpan di localStorage
+  // dengan TTL yang disamakan dengan cache server (CacheService Apps Script,
+  // 6 jam). Kunjungan berikutnya langsung menampilkan foto dari cache, lalu
+  // refresh di background — dan refresh itu sendiri cepat karena server juga
+  // sudah menyimpan daftar foto di cache-nya.
+  const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 jam, samakan dengan CacheService server
+
+  const readGaleriCache = useCallback((): { files: DriveFile[]; full: boolean; fetchedAt: number } | null => {
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.files)) return null;
+      return {
+        files: parsed.files,
+        full: !!parsed.full,
+        fetchedAt: typeof parsed.fetchedAt === 'number' ? parsed.fetchedAt : 0,
+      };
+    } catch {
+      return null; // localStorage tidak tersedia / cache rusak → anggap tidak ada cache
+    }
+  }, [cacheKey]);
+
+  const saveGaleriCache = useCallback((files: DriveFile[], full: boolean) => {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify({ files, full, fetchedAt: Date.now() }));
+    } catch {
+      // localStorage penuh/tidak tersedia, abaikan saja (tidak fatal)
+    }
+  }, [cacheKey]);
+
+  // Ambil PREVIEW foto (cepat) dengan retry otomatis kalau gagal
+  // (Apps Script punya batas kuota eksekusi/menit; kalau banyak album dimuat
+  // bersamaan, sebagian bisa gagal sesaat lalu berhasil kalau dicoba ulang).
+  // Urutan: tampilkan cache dulu (langsung terlihat, tanpa spinner lama) →
+  // refresh di background hanya kalau cache basi atau belum lengkap.
   const loadPreview = useCallback((attempt = 1) => {
+    const cached = attempt === 1 ? readGaleriCache() : null;
+    const cacheFresh = !!cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS;
+
     if (attempt === 1) {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (parsed.full && Array.isArray(parsed.files)) {
-            setState({ status: 'success', files: parsed.files, nextPageToken: null });
-            return;
-          }
-        } catch {
-          // cache rusak, lanjut fetch normal di bawah
-        }
+      if (cached && cached.files.length > 0) {
+        // Tampilkan foto dari cache dulu — galeri langsung terisi di HP.
+        setState({ status: 'success', files: cached.files, nextPageToken: null });
+        // Cache masih fresh & lengkap → tidak perlu memanggil Apps Script lagi.
+        if (cacheFresh && cached.full) return;
+      } else {
+        setState({ status: 'loading', files: [], nextPageToken: null });
       }
-      setState({ status: 'loading', files: [], nextPageToken: null });
     }
 
     fetchFolderFiles(folderId, scriptUrl, PREVIEW_LIMIT)
       .then(({ files, nextPageToken }) => {
         setState({ status: 'success', files, nextPageToken });
-        // Kalau ternyata semua foto sudah termuat dalam preview ini (album kecil),
-        // langsung simpan sebagai cache "full".
-        if (!nextPageToken) {
-          try {
-            sessionStorage.setItem(cacheKey, JSON.stringify({ files, full: true }));
-          } catch {
-            // sessionStorage penuh/tidak tersedia, abaikan saja (tidak fatal)
-          }
-        }
+        // Simpan cache; tandai "full" kalau semua foto sudah termuat dalam
+        // preview ini (album kecil dengan jumlah foto < PREVIEW_LIMIT).
+        saveGaleriCache(files, !nextPageToken);
       })
       .catch(err => {
         console.error(`[GaleriView] Gagal memuat foto (percobaan ${attempt}):`, err);
+        if (cached && cached.files.length > 0) {
+          // Foto lama masih tampil dari cache → retry di background tanpa
+          // mengubah layar (jangan timpa dengan spinner/error).
+          if (attempt < 3) setTimeout(() => loadPreview(attempt + 1), attempt * 1500);
+          return;
+        }
         if (attempt < 3) {
           // coba lagi otomatis dengan jeda yang makin lama (1.5s, 3s)
           setTimeout(() => loadPreview(attempt + 1), attempt * 1500);
@@ -311,7 +346,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
           setState({ status: 'error', files: [], nextPageToken: null, error: err.message });
         }
       });
-  }, [folderId, scriptUrl, cacheKey]);
+  }, [folderId, scriptUrl, cacheKey, readGaleriCache, saveGaleriCache]);
 
   // Ambil SISA foto (dipanggil saat tombol "Lihat Semua Foto" diklik).
   // Melanjutkan dari nextPageToken yang sudah ada, bukan scan folder dari awal.
@@ -326,11 +361,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
         token = nextPageToken;
       }
       setState({ status: 'success', files: allFiles, nextPageToken: null });
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify({ files: allFiles, full: true }));
-      } catch {
-        // abaikan, tidak fatal
-      }
+      saveGaleriCache(allFiles, true);
       setExpanded(true);
     } catch (err: any) {
       console.error('[GaleriView] Gagal memuat sisa foto:', err);
@@ -338,7 +369,7 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
     } finally {
       setLoadingMore(false);
     }
-  }, [folderId, scriptUrl, state.files, state.nextPageToken, cacheKey]);
+  }, [folderId, scriptUrl, state.files, state.nextPageToken, cacheKey, saveGaleriCache]);
 
   // Mulai memuat HANYA saat album ini mendekati area layar (lazy-load),
   // supaya tidak semua album menembak Apps Script bersamaan sekaligus.
