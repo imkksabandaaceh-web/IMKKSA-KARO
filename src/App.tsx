@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspens
 import LoginForm from './components/LoginForm'
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const APanel = lazy(() => import('./components/APanel'))
+const ProposalView = lazy(() => import('./components/ProposalView'))
 import './App.css'
 import AlbumGallery from './components/GaleriView'
 import { umatService } from './services/umat'
@@ -184,7 +185,7 @@ const processHtmlContent = (htmlContent: string): string => {
 
 
 // Types
-type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Login' | 'APanel';
+type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Proposal' | 'Login' | 'APanel';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -486,6 +487,7 @@ function App() {
     { key: 'Galeri' as Tab, label: 'Galeri' },
     { key: 'Data Anggota' as Tab, label: 'Data Anggota' },
     { key: 'Pengurus' as Tab, label: 'Pengurus' },
+    { key: 'Proposal' as Tab, label: 'Proposal' },
   ];
   const hiddenTabsSet = useMemo(() => new Set<string>(siteContent.settings.hiddenTabs || []), [siteContent.settings.hiddenTabs]);
 
@@ -2186,6 +2188,7 @@ function App() {
     if (activeTab === 'Data Anggota') return renderDataAnggota()
     if (activeTab === 'Galeri') return renderGaleri()
     if (activeTab === 'Pengurus') return renderPengurus()
+    if (activeTab === 'Proposal') return <ProposalView isLoggedIn={isLoggedIn} />
     if (activeTab === 'APanel') {
       if (!isLoggedIn) return null
       return (

@@ -419,6 +419,41 @@ h1, h2, h3 {
   }
 }
 
+/* Form Proposal (ProposalView) */
+.form-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  font-size: 0.95rem;
+  background: #fff;
+  color: #1f2937;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: 2px solid var(--primary-color, #2e7d32);
+  outline-offset: 1px;
+}
+
+.btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.btn-cancel:hover {
+  background: #e2e8f0;
+}
+
 /* Buttons */
 button {
   padding: 12px 24px;

@@ -730,6 +730,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
               { key: 'Galeri', label: 'Galeri' },
               { key: 'Data Anggota', label: 'Data Anggota' },
               { key: 'Pengurus', label: 'Pengurus' },
+              { key: 'Proposal', label: 'Proposal' },
             ].map(t => (
               <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontSize: '0.92rem' }}>
                 <input
