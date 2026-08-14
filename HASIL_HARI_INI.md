@@ -184,6 +184,54 @@ create table if not exists public.umat (
 
 ---
 
+## ✅ Fase 6 — Perbaikan Halaman Kosong & Aktivasi Type-Check (14 Agustus 2026)
+
+> Setelah A.Panel diperluas, situs tampil **kosong (halaman putih)**. Bukan masalah
+> build/git — bundle yang dilayani Vercel sudah yang terbaru, tapi ada **bug runtime**
+> yang membuat seluruh aplikasi crash.
+
+### 6.1 Akar masalah halaman kosong (commit `3577b5c`)
+- **Gejala:** situs merespons HTTP 200 tapi tampil putih tanpa konten.
+- **Diagnosis:** bundle produksi (`index-B7nc-Yvt.js`) hash-nya sama persis dengan build lokal →
+  Vercel sudah melayani kode terbaru; masalahnya bukan deploy basi.
+- **Akar:** fitur baru "sembunyikan menu" di `src/App.tsx` memakai `useMemo(...)` tapi
+  `useMemo` **tidak di-import** dari React. Karena file diawali `// @ts-nocheck`, TypeScript
+  tidak memeriksa file ini → `npm run build` lolos, namun di browser `useMemo` bernilai
+  `undefined` → `TypeError: useMemo is not a function` → seluruh app crash.
+- **Perbaikan:** tambahkan `useMemo` ke import React (satu baris).
+
+### 6.2 Aktivasi type-check di App.tsx (commit `e7953b4`)
+- **Motivasi:** `@ts-nocheck` membuat bug seperti di atas lolos ke produksi.
+- **Perubahan:** hapus `// @ts-nocheck` dari `src/App.tsx` → `npm run build` (via `tsc -b`)
+  kini **gagal** bila ada error tipe, sehingga bug kelas ini tidak akan terulang.
+- **Error tipe yang ikut diperbaiki (3):**
+  - Hapus helper mati `getFolderEmbedUrl` (tidak pernah dipakai).
+  - `doc.setFont(undefined, 'bold'/'normal')` → `doc.setFont('helvetica', ...)`
+    (perilaku runtime sama — sebelumnya default ke helvetica).
+- **Verifikasi:** `tsc -b` → 0 error; `npm run build` → lolos; Vercel redeploy otomatis
+  (bundle baru `index-BGEKL5Zy.js` terverifikasi live).
+
+### 6.3 Audit keep-alive Supabase (UptimeRobot + GitHub Actions)
+- **Latar:** Supabase free tier me-pause project setelah 7 hari tanpa aktivitas API.
+- **UptimeRobot dicek via API read-only** (monitor `Supabase Keep-Alive`, id `803521006`):
+
+  | Item | Nilai | Status |
+  |---|---|---|
+  | URL target | `https://vqjcbmnhfrjxooavbkxc.supabase.co/rest/v1/riwayat_download?...` | ✅ Project sama dengan situs |
+  | Status monitor | UP | ✅ |
+  | Interval | 300 detik (5 menit) | ✅ Jauh di bawah batas 7 hari |
+  | HTTP response | 200 OK | ✅ |
+
+- **Kesimpulan:** tidak ada perubahan yang diperlukan. Supabase menghitung aktivitas per
+  project (bukan per tabel), jadi ping ke tabel `riwayat_download` menjaga seluruh project.
+- **Catatan penting:** monitoring situs Vercel saja **tidak** mencegah pause Supabase
+  (UptimeRobot tidak menjalankan JS situs); monitor harus mengarah ke endpoint Supabase
+  langsung — dan ini sudah benar.
+- **Lapis ganda:** selain UptimeRobot, ada GitHub Actions `.github/workflows/keep-alive.yml`
+  (ping tiap Minggu & Rabu). Risiko database ter-pause praktis nol.
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -231,4 +279,6 @@ create table if not exists public.umat (
 <latest> Notifikasi email pendaftaran baru + scope MailApp
 05bf850  Optimasi galeri: cache daftar foto di localStorage + CacheService Apps Script
 c2de41f  Galeri: tombol "Segarkan Foto" (refresh=1) + TTL cache diturunkan ke 2 jam
+3577b5c  Fix: import useMemo yang hilang di App.tsx (crash halaman kosong)
+e7953b4  Aktifkan type-check di App.tsx: hapus @ts-nocheck
 ```
