@@ -42,6 +42,7 @@ body {
   background-size: 30px 30px;
   color: var(--text-color);
   line-height: 1.7;
+  font-size: var(--body-font-size, 1rem);
 }
 
 h1, h2, h3 {
@@ -137,8 +138,8 @@ h1, h2, h3 {
 
 /* Header */
 .header {
-  text-align: center;
-  padding: 80px 20px;
+  text-align: var(--header-align, center);
+  padding: var(--header-padding, 80px 20px);
   background: var(--white);
   background: linear-gradient(135deg, #f7fbf7 0%, #edf5ed 100%);
   border-bottom: 4px solid var(--secondary-color);
@@ -295,18 +296,18 @@ h1, h2, h3 {
 .main-content {
   flex: 1;
   padding: 40px 20px;
-  max-width: 1100px;
+  max-width: var(--content-width, 1100px);
   margin: 0 auto;
   width: 100%;
 }
 
 .page-card {
-  background: var(--white);
+  background: var(--card-bg, var(--white));
   padding: clamp(30px, 6vw, 60px);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-md);
-  border: 1px solid rgba(212, 175, 55, 0.1);
-  margin-bottom: 30px;
+  border-radius: var(--border-radius, 16px);
+  box-shadow: var(--card-shadow, var(--shadow-md));
+  border: 1px solid var(--border-color, rgba(212, 175, 55, 0.1));
+  margin-bottom: var(--section-spacing, 30px);
   transition: var(--transition);
   position: relative;
   overflow: hidden;
@@ -328,13 +329,17 @@ h1, h2, h3 {
 }
 
 .page-card h2 {
-  color: var(--primary-color);
+  color: var(--heading-color, var(--primary-color));
   border-bottom: 2px solid var(--secondary-color);
   padding-bottom: 20px;
   margin-top: 0;
   font-size: 2.2rem;
   text-align: center;
   margin-bottom: 30px;
+}
+
+.content-body a {
+  color: var(--link-color, #1a73e8);
 }
 
 .content-body img {
@@ -428,7 +433,7 @@ button {
 
 .btn-save {
   background: linear-gradient(135deg, var(--nav-bg) 0%, #2c5a41 100%);
-  color: white;
+  color: var(--button-text-color, white);
   box-shadow: 0 4px 12px rgba(27, 58, 42, 0.2);
 }
 
@@ -439,7 +444,7 @@ button {
 
 .btn-delete {
   background: linear-gradient(135deg, #8b0000 0%, #b30000 100%);
-  color: white;
+  color: var(--button-text-color, white);
   box-shadow: 0 4px 12px rgba(139, 0, 0, 0.2);
 }
 
@@ -479,7 +484,7 @@ button {
   margin: 30px 0;
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid #eee;
+  border: 1px solid var(--border-color, #eee);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -492,7 +497,7 @@ button {
 
 .umat-table th, .umat-table td {
   padding: 18px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
   text-align: left;
 }
 
@@ -522,6 +527,47 @@ button {
   font-size: 0.95rem;
   border-top: 4px solid var(--secondary-color);
   letter-spacing: 1px;
+}
+
+.footer-text {
+  white-space: pre-line;
+  letter-spacing: 0.3px;
+}
+
+/* Banner pengumuman (dari A.Panel) */
+.announcement-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  color: #fff;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.announcement-text {
+  flex: 1;
+}
+
+.announcement-close {
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  padding: 0;
+  font-size: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.announcement-close:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* ADMIN DASHBOARD SPECIFIC */

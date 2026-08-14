@@ -215,6 +215,24 @@ interface SiteSettings {
   navFontFamily?: string;
   navFontSize?: string;
   navFontWeight?: string;
+  // --- Pengaturan tambahan A.Panel (Bentuk & Ruang / Isi & Konten / SEO) ---
+  contentWidth?: string;      // lebar area konten (mis. 900px / 1100px / 1300px)
+  borderRadius?: string;      // sudut membulat global (mis. 6px / 16px / 24px)
+  sectionSpacing?: string;    // jarak antar seksi (mis. 20px / 30px / 45px)
+  cardShadow?: string;        // bayangan kartu (none / ringan / sedang / kuat)
+  headerAlign?: string;       // posisi judul header (left / center / right)
+  headerPadding?: string;     // tinggi header (mis. 40px 20px / 80px 20px / 110px 20px)
+  bodyFontSize?: string;      // ukuran font isi (rem)
+  bodyTextColor?: string;     // warna teks isi
+  headingColor?: string;      // warna judul halaman
+  linkColor?: string;         // warna tautan
+  cardBgColor?: string;       // warna latar kartu
+  borderColor?: string;       // warna garis/border
+  buttonTextColor?: string;   // warna teks tombol solid
+  footerText?: string;        // teks footer (alamat/kontak, multi-baris)
+  announcementText?: string;  // banner pengumuman di atas konten
+  metaDescription?: string;   // deskripsi SEO (meta description)
+  hiddenTabs?: string[];      // menu yang disembunyikan (Beranda, Galeri, dll.)
 }
 
 interface GaleriItem {
@@ -303,6 +321,23 @@ const DEFAULT_CONTENT: FullContent = {
     navFontFamily: "'Inter', sans-serif",
     navFontSize: '1rem',
     navFontWeight: '500',
+    contentWidth: '1100px',
+    borderRadius: '16px',
+    sectionSpacing: '30px',
+    cardShadow: '0 8px 24px rgba(0,0,0,0.1)',
+    headerAlign: 'center',
+    headerPadding: '80px 20px',
+    bodyFontSize: '1rem',
+    bodyTextColor: '#2c3e50',
+    headingColor: '#2e7d32',
+    linkColor: '#1a73e8',
+    cardBgColor: '#ffffff',
+    borderColor: '#e5e7eb',
+    buttonTextColor: '#ffffff',
+    footerText: '',
+    announcementText: '',
+    metaDescription: '',
+    hiddenTabs: [],
   },
   pages: {
     'Beranda': {
@@ -444,6 +479,50 @@ function App() {
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [activeTab])
+
+  // ── Menu publik & tab yang disembunyikan via A.Panel ────────────────────
+  const navItems = [
+    { key: 'Beranda' as Tab, label: 'Beranda' },
+    { key: 'Jadwal Keluarga' as Tab, label: 'Jadwal Keluarga' },
+    { key: 'Galeri' as Tab, label: 'Galeri' },
+    { key: 'Data Anggota' as Tab, label: 'Data Anggota' },
+    { key: 'Pengurus' as Tab, label: 'Pengurus' },
+  ];
+  const hiddenTabsSet = useMemo(() => new Set<string>(siteContent.settings.hiddenTabs || []), [siteContent.settings.hiddenTabs]);
+
+  // Kalau tab aktif disembunyikan lewat A.Panel → kembali ke Beranda.
+  useEffect(() => {
+    if (hiddenTabsSet.has(activeTab)) setActiveTab('Beranda');
+  }, [activeTab, hiddenTabsSet]);
+
+  // ── Banner pengumuman (bisa ditutup pengunjung per sesi) ────────────────
+  const announcementText = siteContent.settings.announcementText || '';
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  useEffect(() => {
+    // Muncul lagi kalau teks pengumumannya berubah (mis. admin mengganti isinya).
+    try {
+      setAnnouncementDismissed(sessionStorage.getItem('imkksa_announcement_closed') === announcementText);
+    } catch { /* sessionStorage tidak tersedia → selalu tampil */ }
+  }, [announcementText]);
+  const dismissAnnouncement = () => {
+    setAnnouncementDismissed(true);
+    try { sessionStorage.setItem('imkksa_announcement_closed', announcementText); } catch { /* abaikan */ }
+  };
+
+  // ── Meta description dari A.Panel (SEO) ──────────────────────────────────
+  useEffect(() => {
+    const desc = siteContent.settings.metaDescription;
+    if (!desc) return;
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'description');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', desc);
+    const og = document.querySelector('meta[property="og:description"]');
+    if (og) og.setAttribute('content', desc);
+  }, [siteContent.settings.metaDescription]);
 
   const fetchData = async (isSilent = false) => {
     if (!isSilent) console.log("Memulai pengambilan data dari Google Drive...");
@@ -2303,10 +2382,27 @@ function App() {
     ['--nav-font-family' as any]: s.navFontFamily || "'Inter', sans-serif",
     ['--nav-font-size' as any]: s.navFontSize || '1rem',
     ['--nav-font-weight' as any]: s.navFontWeight || '500',
+    ['--text-color' as any]: s.bodyTextColor || '#2c3e50',
+    // Pengaturan tambahan (Bentuk & Ruang / Isi & Konten) — default CSS tetap
+    // berlaku kalau admin belum pernah mengaturnya.
+    ['--content-width' as any]: s.contentWidth || '',
+    ['--border-radius' as any]: s.borderRadius || '',
+    ['--section-spacing' as any]: s.sectionSpacing || '',
+    ['--card-shadow' as any]: s.cardShadow || '',
+    ['--header-align' as any]: s.headerAlign || '',
+    ['--header-padding' as any]: s.headerPadding || '',
+    ['--body-font-size' as any]: s.bodyFontSize || '',
+    ['--heading-color' as any]: s.headingColor || '',
+    ['--link-color' as any]: s.linkColor || '',
+    ['--card-bg' as any]: s.cardBgColor || '',
+    ['--border-color' as any]: s.borderColor || '',
+    ['--button-text-color' as any]: s.buttonTextColor || '',
   };
 
   const headerStyle: React.CSSProperties = s.headerBgImage ? {
-    backgroundImage: `linear-gradient(${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}, ${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}), url(${s.headerBgImage})`,
+    // Gambar latar header disajikan lewat ImageKit (proxy + transformasi),
+    // supaya tetap tajam tapi ukuran unduhannya kecil di HP.
+    backgroundImage: `linear-gradient(${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}, ${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}), url(${toImageKitUrl(s.headerBgImage, 1920)})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
   } : {};
@@ -2320,11 +2416,9 @@ function App() {
       <nav className="navbar">
         <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? '✕' : '☰'} Menu</div>
         <ul className={`nav-links ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-          <li className={activeTab === 'Beranda' ? 'active' : ''} onClick={() => setActiveTab('Beranda')}>Beranda</li>
-          <li className={activeTab === 'Jadwal Keluarga' ? 'active' : ''} onClick={() => setActiveTab('Jadwal Keluarga')}>Jadwal Keluarga</li>
-          <li className={activeTab === 'Galeri' ? 'active' : ''} onClick={() => setActiveTab('Galeri')}>Galeri</li>
-          <li className={activeTab === 'Data Anggota' ? 'active' : ''} onClick={() => setActiveTab('Data Anggota')}>Data Anggota</li>
-          <li className={activeTab === 'Pengurus' ? 'active' : ''} onClick={() => setActiveTab('Pengurus')}>Pengurus</li>
+          {navItems.filter(item => !hiddenTabsSet.has(item.key)).map(item => (
+            <li key={item.key} className={activeTab === item.key ? 'active' : ''} onClick={() => setActiveTab(item.key)}>{item.label}</li>
+          ))}
           {isLoggedIn ? (
             <>
               <li
@@ -2341,12 +2435,27 @@ function App() {
           )}
         </ul>
       </nav>
+      {announcementText && !announcementDismissed && (
+        <div className="announcement-bar">
+          <span className="announcement-text">{announcementText}</span>
+          <button className="announcement-close" onClick={dismissAnnouncement} aria-label="Tutup pengumuman">✕</button>
+        </div>
+      )}
       <main className="main-content">
         <Suspense fallback={<div className="page-content" style={{ textAlign: 'center', padding: '40px' }}>Memuat...</div>}>
           {renderPage()}
         </Suspense>
       </main>
-      <footer className="footer">&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</footer>
+      <footer className="footer">
+        {siteContent.settings.footerText ? (
+          <>
+            <div className="footer-text">{siteContent.settings.footerText}</div>
+            <div style={{ marginTop: '10px', opacity: 0.8 }}>&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</div>
+          </>
+        ) : (
+          <>&copy; 2026 IMKKSA Banda Aceh Sekitar. All Rights Reserved.</>
+        )}
+      </footer>
       {renderFormulirPendaftaranModal()}
     </div>
   )

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { compressImage } from '../utils/imageUtils';
+import { compressImage, toImageKitUrl } from '../utils/imageUtils';
 
 // --- Tipe ini harus selalu sama persis dengan interface SiteSettings di App.tsx ---
 interface SiteSettings {
@@ -18,6 +18,23 @@ interface SiteSettings {
   navFontFamily?: string;
   navFontSize?: string;
   navFontWeight?: string;
+  contentWidth?: string;
+  borderRadius?: string;
+  sectionSpacing?: string;
+  cardShadow?: string;
+  headerAlign?: string;
+  headerPadding?: string;
+  bodyFontSize?: string;
+  bodyTextColor?: string;
+  headingColor?: string;
+  linkColor?: string;
+  cardBgColor?: string;
+  borderColor?: string;
+  buttonTextColor?: string;
+  footerText?: string;
+  announcementText?: string;
+  metaDescription?: string;
+  hiddenTabs?: string[];
 }
 
 interface APanelProps {
@@ -27,20 +44,20 @@ interface APanelProps {
   scriptUrl: string;
 }
 
+// Hanya font yang benar-benar dimuat situs (index.html) atau font sistem:
+// Inter & Playfair Display (dari Google Fonts) + Georgia (font sistem, gratis).
+// Font lain (Poppins/Montserrat/Outfit) dihapus karena tidak pernah dimuat —
+// dulu kalau dipilih, browser diam-diam memakai fallback sans-serif.
 const FONT_FAMILIES_HEADER = [
   { label: 'Playfair Display (Klasik & Elegan)', value: "'Playfair Display', serif" },
-  { label: 'Outfit (Modern Bersih)', value: "'Outfit', sans-serif" },
-  { label: 'Poppins (Bulat & Modern)', value: "'Poppins', sans-serif" },
-  { label: 'Montserrat (Tegas & Bersih)', value: "'Montserrat', sans-serif" },
   { label: 'Inter (Minimalis Standar)', value: "'Inter', sans-serif" },
-  { label: 'Georgia (Serif Formal)', value: 'Georgia, serif' },
+  { label: 'Georgia (Serif Formal — font sistem)', value: 'Georgia, serif' },
 ];
 
 const FONT_FAMILIES_NAV = [
   { label: 'Inter (Rapi & Minimalis)', value: "'Inter', sans-serif" },
-  { label: 'Poppins (Ramah & Bulat)', value: "'Poppins', sans-serif" },
-  { label: 'Montserrat (Serbaguna)', value: "'Montserrat', sans-serif" },
-  { label: 'Outfit (Modern)', value: "'Outfit', sans-serif" },
+  { label: 'Playfair Display (Elegan)', value: "'Playfair Display', serif" },
+  { label: 'Georgia (Serif — font sistem)', value: 'Georgia, serif' },
 ];
 
 const FONT_WEIGHTS = [
@@ -74,6 +91,17 @@ const COLOR_PRESETS_SITE_BG = [
   { name: 'Abu Terang', hex: '#f8fafc' },
 ];
 
+// Preset tema cepat — satu klik langsung mengisi warna utama, navbar, dan latar.
+// Catatan: preset tidak mengubah warna teks tombol agar kontras tetap aman.
+const THEME_PRESETS: { name: string; c: Record<string, string> }[] = [
+  { name: '🌿 Hijau IMKKSA', c: { primaryColor: '#2e7d32', secondaryColor: '#8bc34a', navBgColor: '#2f5d50', siteBgColor: '#f4f8f4', bodyTextColor: '#2c3e50', headingColor: '#2e7d32', cardBgColor: '#ffffff', borderColor: '#e5e7eb' } },
+  { name: '🌊 Navy Elegan', c: { primaryColor: '#1a365d', secondaryColor: '#3b82f6', navBgColor: '#0f2447', siteBgColor: '#eef3fb', bodyTextColor: '#1e293b', headingColor: '#1a365d', cardBgColor: '#ffffff', borderColor: '#dbe4f0' } },
+  { name: '🍷 Marun Klasik', c: { primaryColor: '#8b0000', secondaryColor: '#d97706', navBgColor: '#5f1f1f', siteBgColor: '#fdf6f6', bodyTextColor: '#3f2d2d', headingColor: '#8b0000', cardBgColor: '#ffffff', borderColor: '#f0dcdc' } },
+  { name: '🌾 Emas Hangat', c: { primaryColor: '#b45309', secondaryColor: '#f59e0b', navBgColor: '#78350f', siteBgColor: '#fffbeb', bodyTextColor: '#3f3527', headingColor: '#b45309', cardBgColor: '#ffffff', borderColor: '#f3e3c2' } },
+  { name: '🌙 Gelap (Dark)', c: { primaryColor: '#4ade80', secondaryColor: '#22c55e', navBgColor: '#111827', siteBgColor: '#0f172a', bodyTextColor: '#e2e8f0', headingColor: '#4ade80', cardBgColor: '#1e293b', borderColor: '#334155' } },
+  { name: '🪨 Abu Bersih', c: { primaryColor: '#334155', secondaryColor: '#64748b', navBgColor: '#1e293b', siteBgColor: '#f8fafc', bodyTextColor: '#334155', headingColor: '#334155', cardBgColor: '#ffffff', borderColor: '#e2e8f0' } },
+];
+
 // Helper: ambil nilai alpha (0-1) dari string 'rgba(0, 0, 0, 0.25)'
 const getOverlayAlpha = (rgba: string): number => {
   const match = rgba.match(/rgba?\([^)]*,\s*([\d.]+)\s*\)/);
@@ -90,8 +118,55 @@ const readFileAsBase64 = (file: File): Promise<string> => {
   });
 };
 
+// ── Komponen kecil untuk pengaturan A.Panel ────────────────────────────────
+const ChoiceField = ({ label, value, options, onChange }: {
+  label: string;
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (v: string) => void;
+}) => (
+  <div style={{ marginBottom: '24px' }}>
+    <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+      {label}: <span style={{ color: '#2e7d32' }}>{value}</span>
+    </label>
+    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      {options.map(o => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '20px',
+            border: value === o.value ? '2px solid #2e7d32' : '1px solid #cbd5e1',
+            backgroundColor: value === o.value ? '#e8f5e9' : '#fff',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const ColorField = ({ label, value, onChange }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) => (
+  <div style={{ marginBottom: '20px' }}>
+    <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>{label}</label>
+    <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'} onChange={e => onChange(e.target.value)} style={{ width: '50px', height: '42px', border: 'none', cursor: 'pointer', borderRadius: '6px' }} />
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '140px', fontFamily: 'monospace' }} />
+    </div>
+  </div>
+);
+
 export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogout, scriptUrl }) => {
-  const [activeTab, setActiveTab] = useState<'header' | 'navigasi'>('header');
+  const [activeTab, setActiveTab] = useState<'header' | 'navigasi' | 'bentuk' | 'isi' | 'seo'>('header');
 
   // --- State pengaturan (diisi dari settings yang sedang aktif) ---
   const [siteTitle, setSiteTitle] = useState(settings.title || 'IMKKSA Banda Aceh Sekitar');
@@ -110,6 +185,37 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
   const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor || '#8bc34a');
   const [siteBgColor, setSiteBgColor] = useState(settings.siteBgColor || '#f4f8f4');
 
+  // --- Pengaturan tambahan (Bentuk & Ruang / Isi & Konten / SEO) ---
+  const [contentWidth, setContentWidth] = useState(settings.contentWidth || '1100px');
+  const [borderRadius, setBorderRadius] = useState(settings.borderRadius || '16px');
+  const [sectionSpacing, setSectionSpacing] = useState(settings.sectionSpacing || '30px');
+  const [cardShadow, setCardShadow] = useState(settings.cardShadow || '0 8px 24px rgba(0,0,0,0.1)');
+  const [headerAlign, setHeaderAlign] = useState(settings.headerAlign || 'center');
+  const [headerPadding, setHeaderPadding] = useState(settings.headerPadding || '80px 20px');
+  const [bodyFontSize, setBodyFontSize] = useState(settings.bodyFontSize || '1rem');
+  const [bodyTextColor, setBodyTextColor] = useState(settings.bodyTextColor || '#2c3e50');
+  const [headingColor, setHeadingColor] = useState(settings.headingColor || '#2e7d32');
+  const [linkColor, setLinkColor] = useState(settings.linkColor || '#1a73e8');
+  const [cardBgColor, setCardBgColor] = useState(settings.cardBgColor || '#ffffff');
+  const [borderColor, setBorderColor] = useState(settings.borderColor || '#e5e7eb');
+  const [buttonTextColor, setButtonTextColor] = useState(settings.buttonTextColor || '#ffffff');
+  const [footerText, setFooterText] = useState(settings.footerText || '');
+  const [announcementText, setAnnouncementText] = useState(settings.announcementText || '');
+  const [metaDescription, setMetaDescription] = useState(settings.metaDescription || '');
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>(settings.hiddenTabs || []);
+
+  // Terapkan preset tema ke semua field warna yang ada di panel.
+  const applyPreset = (c: Record<string, string>) => {
+    if (c.primaryColor) setPrimaryColor(c.primaryColor);
+    if (c.secondaryColor) setSecondaryColor(c.secondaryColor);
+    if (c.navBgColor) setNavBgColor(c.navBgColor);
+    if (c.siteBgColor) setSiteBgColor(c.siteBgColor);
+    if (c.bodyTextColor) setBodyTextColor(c.bodyTextColor);
+    if (c.headingColor) setHeadingColor(c.headingColor);
+    if (c.cardBgColor) setCardBgColor(c.cardBgColor);
+    if (c.borderColor) setBorderColor(c.borderColor);
+  };
+
   // --- Status upload & simpan ---
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingHeaderBg, setIsUploadingHeaderBg] = useState(false);
@@ -117,9 +223,9 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Upload gambar ke Google Drive lewat Apps Script (pola yang sama dengan upload logo di AdminDashboard)
-  const uploadImage = async (file: File): Promise<string> => {
+  const uploadImage = async (file: File, maxWidth = 1200, quality = 0.8): Promise<string> => {
     const rawBase64 = await readFileAsBase64(file);
-    const compressed = await compressImage(rawBase64, 1200, 0.8);
+    const compressed = await compressImage(rawBase64, maxWidth, quality);
 
     const res = await fetch(scriptUrl, {
       method: 'POST',
@@ -156,7 +262,9 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
     setIsUploadingHeaderBg(true);
     setMessage(null);
     try {
-      const url = await uploadImage(file);
+      // Gambar latar header dikompres agak besar (1600px) supaya tetap tajam
+      // di layar lebar, lalu disajikan lewat ImageKit di sisi render.
+      const url = await uploadImage(file, 1600, 0.75);
       setHeaderBgImage(url);
       setMessage({ type: 'success', text: 'Gambar latar header berhasil diunggah!' });
     } catch (err: any) {
@@ -191,6 +299,23 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
       navFontWeight,
       secondaryColor,
       siteBgColor,
+      contentWidth,
+      borderRadius,
+      sectionSpacing,
+      cardShadow,
+      headerAlign,
+      headerPadding,
+      bodyFontSize,
+      bodyTextColor,
+      headingColor,
+      linkColor,
+      cardBgColor,
+      borderColor,
+      buttonTextColor,
+      footerText,
+      announcementText,
+      metaDescription,
+      hiddenTabs,
     };
 
     try {
@@ -236,11 +361,14 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
         {[
           { key: 'header', label: '🖼️ Header & Logo' },
           { key: 'navigasi', label: '🧭 Navigasi & Warna' },
+          { key: 'bentuk', label: '📐 Bentuk & Ruang' },
+          { key: 'isi', label: '✍️ Isi & Konten' },
+          { key: 'seo', label: '📝 Konten & SEO' },
         ].map(tab => (
           <button
             key={tab.key}
             type="button"
-            onClick={() => setActiveTab(tab.key as 'header' | 'navigasi')}
+            onClick={() => setActiveTab(tab.key as 'header' | 'navigasi' | 'bentuk' | 'isi' | 'seo')}
             style={{
               padding: '10px 20px',
               border: 'none',
@@ -370,6 +498,24 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
       {activeTab === 'navigasi' && (
         <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
           <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🎨 Preset Tema Cepat</label>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {THEME_PRESETS.map(p => (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => applyPreset(p.c)}
+                  style={{ padding: '8px 14px', borderRadius: '20px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '8px 0 0' }}>
+              Sekali klik langsung mengisi warna utama, navbar, latar halaman, dan teks isi (termasuk tema Gelap).
+            </p>
+          </div>
+          <div style={{ marginBottom: '24px' }}>
             <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🎨 Warna Latar Belakang Navbar (menu)</label>
             <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
               <input type="color" value={navBgColor} onChange={e => setNavBgColor(e.target.value)} style={{ width: '50px', height: '42px', border: 'none', cursor: 'pointer', borderRadius: '6px' }} />
@@ -451,6 +597,156 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
         </div>
       )}
 
+      {/* TAB 3: BENTUK & RUANG */}
+      {activeTab === 'bentuk' && (
+        <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+          <ChoiceField
+            label="📐 Lebar Konten Halaman"
+            value={contentWidth}
+            onChange={setContentWidth}
+            options={[
+              { label: 'Sempit (900px)', value: '900px' },
+              { label: 'Sedang (1100px)', value: '1100px' },
+              { label: 'Lebar (1300px)', value: '1300px' },
+            ]}
+          />
+          <ChoiceField
+            label="🟦 Sudut Membulat Global"
+            value={borderRadius}
+            onChange={setBorderRadius}
+            options={[
+              { label: 'Tajam (6px)', value: '6px' },
+              { label: 'Sedang (16px)', value: '16px' },
+              { label: 'Bulat (24px)', value: '24px' },
+            ]}
+          />
+          <ChoiceField
+            label="↕️ Jarak Antar Seksi"
+            value={sectionSpacing}
+            onChange={setSectionSpacing}
+            options={[
+              { label: 'Rapat (20px)', value: '20px' },
+              { label: 'Normal (30px)', value: '30px' },
+              { label: 'Lega (45px)', value: '45px' },
+            ]}
+          />
+          <ChoiceField
+            label="🌫️ Bayangan Kartu"
+            value={cardShadow}
+            onChange={setCardShadow}
+            options={[
+              { label: 'Tanpa', value: 'none' },
+              { label: 'Ringan', value: '0 2px 8px rgba(0,0,0,0.06)' },
+              { label: 'Sedang', value: '0 8px 24px rgba(0,0,0,0.1)' },
+              { label: 'Kuat', value: '0 16px 48px rgba(0,0,0,0.16)' },
+            ]}
+          />
+          <ChoiceField
+            label="📌 Posisi Judul Header"
+            value={headerAlign}
+            onChange={setHeaderAlign}
+            options={[
+              { label: 'Kiri', value: 'left' },
+              { label: 'Tengah', value: 'center' },
+              { label: 'Kanan', value: 'right' },
+            ]}
+          />
+          <ChoiceField
+            label="📏 Tinggi Header"
+            value={headerPadding}
+            onChange={setHeaderPadding}
+            options={[
+              { label: 'Kompak', value: '40px 20px' },
+              { label: 'Standar', value: '80px 20px' },
+              { label: 'Lega', value: '110px 20px' },
+            ]}
+          />
+        </div>
+      )}
+
+      {/* TAB 4: ISI & KONTEN */}
+      {activeTab === 'isi' && (
+        <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+              🔤 Ukuran Font Isi: <span style={{ color: '#2e7d32' }}>{bodyFontSize}</span>
+            </label>
+            <input
+              type="range"
+              min={0.85}
+              max={1.15}
+              step={0.05}
+              value={parseFloat(bodyFontSize)}
+              onChange={e => setBodyFontSize(`${e.target.value}rem`)}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <ColorField label="✍️ Warna Teks Isi" value={bodyTextColor} onChange={setBodyTextColor} />
+          <ColorField label="📰 Warna Judul Halaman" value={headingColor} onChange={setHeadingColor} />
+          <ColorField label="🔗 Warna Tautan" value={linkColor} onChange={setLinkColor} />
+          <ColorField label="🃏 Warna Latar Kartu" value={cardBgColor} onChange={setCardBgColor} />
+          <ColorField label="〰️ Warna Border / Garis" value={borderColor} onChange={setBorderColor} />
+          <ColorField label="🔘 Warna Teks Tombol Solid" value={buttonTextColor} onChange={setButtonTextColor} />
+        </div>
+      )}
+
+      {/* TAB 5: KONTEN & SEO */}
+      {activeTab === 'seo' && (
+        <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🦶 Teks Footer (alamat, kontak, dll — tampil di bawah halaman)</label>
+            <textarea
+              value={footerText}
+              onChange={e => setFooterText(e.target.value)}
+              rows={3}
+              placeholder="Contoh:&#10;Sekretariat: Jl. ... Banda Aceh&#10;Email: imkksabandaaceh@gmail.com"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'inherit', fontSize: '0.95rem', resize: 'vertical' }}
+            />
+          </div>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>📢 Banner Pengumuman (opsional — bisa ditutup pengunjung)</label>
+            <input
+              type="text"
+              value={announcementText}
+              onChange={e => setAnnouncementText(e.target.value)}
+              placeholder="Contoh: Ibadah Keluarga Minggu, 20 Agustus 2026 pukul 10.00 WIB"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.95rem' }}
+            />
+          </div>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🔎 Deskripsi SEO (meta description — dipakai Google & pratinjau WhatsApp)</label>
+            <textarea
+              value={metaDescription}
+              onChange={e => setMetaDescription(e.target.value)}
+              rows={3}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'inherit', fontSize: '0.95rem', resize: 'vertical' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🙈 Sembunyikan Menu (tab tidak tampil di navbar)</label>
+            {[
+              { key: 'Beranda', label: 'Beranda' },
+              { key: 'Jadwal Keluarga', label: 'Jadwal Keluarga' },
+              { key: 'Galeri', label: 'Galeri' },
+              { key: 'Data Anggota', label: 'Data Anggota' },
+              { key: 'Pengurus', label: 'Pengurus' },
+            ].map(t => (
+              <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontSize: '0.92rem' }}>
+                <input
+                  type="checkbox"
+                  checked={hiddenTabs.includes(t.key)}
+                  onChange={e => setHiddenTabs(prev => e.target.checked ? [...prev, t.key] : prev.filter(k => k !== t.key))}
+                />
+                {t.label}
+              </label>
+            ))}
+            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '8px 0 0' }}>
+              Tab yang disembunyikan tidak tampil di menu, dan pengunjung tidak bisa membukanya.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* LIVE PREVIEW */}
       <div style={{ backgroundColor: siteBgColor, padding: '16px', borderRadius: '12px', border: '2px dashed #cbd5e1', marginBottom: '24px', transition: 'background-color 0.3s ease' }}>
         <h4 style={{ marginTop: 0, color: '#475569', fontSize: '0.9rem' }}>👁️ Pratinjau Langsung</h4>
@@ -460,7 +756,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
             textAlign: 'center',
             padding: '30px 15px',
             backgroundColor: '#ffffff',
-            backgroundImage: headerBgImage ? `linear-gradient(${headerBgOverlay}, ${headerBgOverlay}), url(${headerBgImage})` : undefined,
+            backgroundImage: headerBgImage ? `linear-gradient(${headerBgOverlay}, ${headerBgOverlay}), url(${toImageKitUrl(headerBgImage, 1920)})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             borderBottom: `4px solid ${secondaryColor}`,
