@@ -1,4 +1,4 @@
-# 📋 HASIL PEKERJAAN — IMKKSA KARO (7 & 14 Agustus 2026)
+# 📋 HASIL PEKERJAAN — IMKKSA KARO (7, 14 & 18 Agustus 2026)
 
 > Dokumen ini merangkum **seluruh pekerjaan** yang dilakukan dalam sesi ini agar mudah
 > ditinjau ulang (misalnya dengan bantuan AI/Claude). Semua perubahan sudah di-commit
@@ -284,6 +284,57 @@ Detail uji UI lengkap (login `imkksa01@imkksa.org`):
 
 ---
 
+## ✅ Fase 8 — Update ISI.pdf: Info Donasi & Narahubung + Optimasi Ukuran + Uji Browser (18 Agustus 2026)
+
+> Admin memperbarui `public/ISI.pdf` dengan **bagian Sumbangan** (rekening Bank Mandiri a/n Efron
+> Andre Tarigan, No. Rekening 1370003225261) dan **Contact Person** (3 narahubung), lalu diminta:
+> update via build/git/script/supabase, pastikan file ringan, dan uji browser sungguhan.
+
+### 8.1 Optimasi ukuran ISI.pdf (365 KB → 347 KB) — commit `ecef937`
+- **Analisis isi PDF** (parsing xref + stream): font sudah *subsetted* (Aptos/Arial/Times, ±152 KB),
+  gambar kecil (maks. 53 KB), stream sudah Flate-compressed, dan **tidak ada objek duplikat** →
+  tidak ada ruang besar untuk dipangkas lossless.
+- **Optimasi:** re-save lossless via **`pdf-lib`** (library yang sama dipakai aplikasi saat generate):
+  **365.714 → 347.210 byte (±5% lebih ringan)**.
+- **Verifikasi kesetaraan:** output generate (isi field cover + gabung + flatten) dari template lama
+  vs baru **byte-identik** (SHA-256 sama) → konten baru (Sumbangan/narahubung) pasti ikut terbawa.
+- Percobaan recompress zlib level-9 hanya hemat ±2,8% → tidak sepadan dengan risiko menulis ulang
+  PDF manual. Kompresi lebih agresif butuh Ghostscript (lossy, berisiko mengubah tampilan).
+- **Catatan penting:** template PDF **tidak memperlambat loading website** — hanya di-`fetch` saat
+  admin klik *PROSES & GENERATE PDF* (lazy load), bukan saat halaman dibuka.
+
+### 8.2 Deployment: build + git + supabase
+- **Build:** `npm run build` (type-check `tsc -b` 0 error) → `dist/ISI.pdf` = file baru (MD5 sama
+  dengan `public/`).
+- **Git:** commit `ecef937` + `git push origin master` → sekaligus mengirim **4 commit yang
+  sebelumnya belum ter-push** (`5b15393`, `18c8727`, `52b4403`, `6c1a0a2`) → Vercel auto-deploy.
+- **Verifikasi live:** `curl https://www.imkksa-bandaaceh.site/ISI.pdf` → **347.210 byte** ✅.
+- **Supabase — tidak ada yang perlu diupdate:** storage bucket **kosong** (`[]`, dicek via REST) —
+  template PDF hidup di hosting statis (`public/` → `dist/` → Vercel), bukan di Supabase. Supabase
+  hanya menyimpan **teks riwayat** proposal (tabel `riwayat_download`).
+- **"Script"** (deploy.sh/deploy.bat) tidak dijalankan karena interaktif & pesan commit default-nya
+  keliru ("hapus fitur PDF"); langkah setara dikerjakan manual (build → commit → push). Apps Script
+  (`clasp`) tidak perlu di-deploy ulang — `Code.js` tidak berubah.
+
+### 8.3 Uji browser sungguhan — semua lulus ✅ (login admin asli)
+- Chrome headless via CDP (Node `WebSocket` bawaan, tanpa puppeteer): login `imkksa01@imkksa.org` →
+  menu Proposal → isi pengirim/penerima 2 baris → klik **PROSES & GENERATE PDF**.
+- Hasil: *"Proposal dibuat: 003/PROP/IMKKSA/VIII/2026"* → PDF `Proposal_003_PROP_IMKKSA_VIII_2026.pdf`
+  (**723.304 byte**, **7 halaman** = 2 cover + 5 isi), **0 error JavaScript**.
+- **Download headless tidak jatuh ke disk** → blob PDF di-intersepsi langsung di halaman
+  (hook `URL.createObjectURL`), byte persis yang dihasilkan browser.
+- Validasi `pdftotext`: field cover terisi (nomor, tanggal **18 Agustus 2026**, penerima 2 baris) dan
+  **konten baru ISI.pdf ada semua**: Sumbangan, BANK MANDIRI a/n EFRON ANDRE TARIGAN, Rekening
+  1370003225261, Contact Person (drh. Idaman Sembiring 0812-7733-8861, Serba Lazoerta Ginting
+  0813-7591-1675, Bastanta Bangun 0852-9755-4841), X. PENUTUP, *Bujur ras Mejuah-juah*.
+- **Bukti live == repo:** teks hasil generate live **identik** dengan generate lokal dari template repo
+  (beda SHA-256 hanya karena `/ID` acak pdf-lib per save).
+- **Pembersihan:** 3 baris riwayat uji (001/002/003; 002 dari percobaan skrip yang sempat menggantung)
+  dihapus dari Supabase (HTTP 204 → tabel kembali `[]`); Chrome headless dimatikan; semua file/folder
+  uji dihapus; `git status` bersih.
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -338,4 +389,5 @@ e7953b4  Aktifkan type-check di App.tsx: hapus @ts-nocheck
 8993b79  Menu Proposal: generate PDF otomatis bernomor + riwayat Supabase
 5b15393  Perbarui template PDF cover/isi + petakan field form secara otomatis
 18c8727  Beri nama field form di COVER.pdf (nomor_surat, tanggal_surat, tujuan_surat)
+ecef937  Perbarui ISI.pdf: tambah info donasi & narahubung, optimasi ukuran (365 KB → 347 KB)
 ```
