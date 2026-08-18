@@ -106,12 +106,14 @@ export default function ProposalView({ isLoggedIn }: ProposalViewProps) {
     };
   }, [isLoggedIn, getNextNomor]);
 
-  const resetForm = () => {
+  // keepMsg=true → reset hanya isi form (dipakai setelah submit sukses, supaya
+  // pesan "Proposal dibuat: ..." tetap terlihat). Default (tombol Batal) → pesan dibersihkan.
+  const resetForm = (keepMsg = false) => {
     setPemohon('');
     setTujuan('');
     setTanggalSurat(todayIso());
     setEditingId(null);
-    setMsg(null);
+    if (!keepMsg) setMsg(null);
     getNextNomor()
       .then((n) => setPreviewNomor(formatNomorSurat(n)))
       .catch(() => {});
@@ -144,10 +146,19 @@ export default function ProposalView({ isLoggedIn }: ProposalViewProps) {
         if (error) throw error;
         await loadRows();
         setMsg({ type: 'ok', text: 'Proposal berhasil diperbarui.' });
+        resetForm(true);
       } else {
         // ── BUAT BARU ────────────────────────────────────────
         const noUrut = await getNextNomor();
         const nomorSurat = formatNomorSurat(noUrut);
+        // Generate & unduh PDF DULU. Kalau gagal (mis. field cover berubah nama
+        // setelah template di-export ulang), TIDAK ada baris tersimpan & nomor
+        // tidak terpakai → admin bisa perbaiki lalu coba lagi dari nomor yang sama.
+        await doGenerate({
+          nomorSurat,
+          tanggalSurat: formatTanggal(tanggalSurat),
+          tujuanSurat: tujuan.trim(),
+        });
         const { error } = await supabase
           .from('riwayat_download')
           .insert({
@@ -162,14 +173,8 @@ export default function ProposalView({ isLoggedIn }: ProposalViewProps) {
         if (error) throw error;
         await loadRows();
         setMsg({ type: 'ok', text: `Proposal dibuat: ${nomorSurat}` });
-        // Generate & unduh PDF otomatis
-        await doGenerate({
-          nomorSurat,
-          tanggalSurat: formatTanggal(tanggalSurat),
-          tujuanSurat: tujuan.trim(),
-        });
+        resetForm(true);
       }
-      resetForm();
     } catch (e) {
       console.error('Gagal simpan proposal:', e);
       setMsg({ type: 'err', text: 'Gagal menyimpan proposal: ' + (e instanceof Error ? e.message : String(e)) });
@@ -188,7 +193,7 @@ export default function ProposalView({ isLoggedIn }: ProposalViewProps) {
       });
     } catch (e) {
       console.error('Gagal generate PDF:', e);
-      setMsg({ type: 'err', text: 'Gagal membuat PDF. Cek konsol (F12) untuk detail field.' });
+      setMsg({ type: 'err', text: 'Gagal membuat PDF: ' + (e instanceof Error ? e.message : String(e)) });
     }
   };
 
@@ -293,7 +298,7 @@ export default function ProposalView({ isLoggedIn }: ProposalViewProps) {
                 {isGenerating ? '⏳ Menyimpan...' : editingId !== null ? '💾 Simpan Perubahan' : '🚀 PROSES & GENERATE PDF'}
               </button>
               {editingId !== null && (
-                <button className="btn-cancel" onClick={resetForm}>
+                <button className="btn-cancel" onClick={() => resetForm()}>
                   Batal
                 </button>
               )}

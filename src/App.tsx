@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import LoginForm from './components/LoginForm'
+import { authService } from './services/auth'
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const APanel = lazy(() => import('./components/APanel'))
 const ProposalView = lazy(() => import('./components/ProposalView'))
@@ -809,9 +810,24 @@ function App() {
     migrateBase64Photos();
   }, [isLoggedIn, siteContent.pengurus]);
 
+  // Pulihkan sesi admin saat halaman dimuat ulang (refresh) — sesi Supabase
+  // tersimpan di localStorage, jadi admin tidak logout otomatis hanya karena refresh.
+  useEffect(() => {
+    let active = true
+    authService.restoreSession().then((ok) => {
+      if (active && ok) setIsLoggedIn(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
   const handleLogout = () => {
+    // Logout hanya terjadi saat tombol Logout ditekan: reset UI sekarang,
+    // lalu benar-benar sign out dari Supabase (hapus sesi di browser).
     setIsLoggedIn(false)
     setActiveTab('Beranda')
+    authService.logout().catch((err) => console.error('Gagal logout dari Supabase:', err))
   }
 
   const saveChanges = async (updatedData?: any) => {

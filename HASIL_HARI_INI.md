@@ -279,8 +279,8 @@ Detail uji UI lengkap (login `imkksa01@imkksa.org`):
   diunduh berkali-kali dari perangkat berbeda tanpa menyimpan file PDF.
 - **Penomoran surat:** `MAX(no_urut) + 1`; jika tabel `riwayat_download` kosong, nomor
   mulai lagi dari `001`.
-- Catatan: `App.tsx` tidak me-restore sesi admin dari localStorage — status login hanya
-  benar setelah login sungguhan lewat Supabase Auth (bukan bug, perilaku bawaan).
+- Catatan: **perilaku ini sudah diubah di Fase 10** — sesi admin kini dipulihkan dari
+  localStorage saat halaman dimuat ulang, jadi refresh tidak lagi meng-out admin.
 
 ---
 
@@ -386,6 +386,56 @@ Detail uji UI lengkap (login `imkksa01@imkksa.org`):
 
 ---
 
+## ✅ Fase 10 — Login Tidak Logout Saat Refresh + Logout Sungguhan + PDF Lebih Tahan Banting (18 Agustus 2026)
+
+> Jawaban atas pertanyaan admin: (1) kenapa update PDF selalu muncul error, dan (2) kenapa
+> refresh selalu meng-out login admin. Keduanya diperbaiki di fase ini + diuji di browser.
+
+### 10.1 Kenapa update PDF selalu error? (akar masalah & perbaikan)
+- **Akar masalah:** setiap kali `COVER.pdf` di-export ulang dari Nitro 8/Word, software tersebut
+  **meng-reset nama kotak isian form** menjadi generik (`Text1`/`Text2`/`Text3`) — bukan
+  `nomor_surat`/`tanggal_surat`/`tujuan_surat` yang dicari kode saat generate. Kalau kode tidak
+  menemukan field → error saat klik **PROSES & GENERATE PDF**. Tidak ada risiko kehilangan data.
+- **Perbaikan 1 — fallback diperkuat (`src/utils/pdfUtils.ts`):** pemetaan otomatis kini:
+  `tujuan` = field bernama `tujuan_surat` → multiline → **kotak terluas** (fallback terakhir);
+  `nomor` = paling kiri; `tanggal` = paling kanan. Diuji: PDF dengan `Text1/Text2/Text3` tanpa
+  flag multiline tetap terpetakan benar ✅.
+- **Perbaikan 2 — pesan error jelas:** kalau tetap gagal, admin diberi tahu persis cara
+  memperbaikinya di Nitro 8 (klik kanan kotak isian → Properties → beri nama `nomor_surat`,
+  `tanggal_surat`, `tujuan_surat` + centang Multiline) — bukan error membingungkan.
+- **Perbaikan 3 — generate sebelum simpan (`ProposalView.tsx`):** PDF dibuat & diunduh DULU,
+  baru baris riwayat di-insert. Kalau generate gagal (template bermasalah), **tidak ada baris
+  tersimpan & nomor surat tidak terpakai** → admin bisa perbaiki lalu coba lagi dari nomor sama.
+  (Sebelumnya: baris tersimpan dulu, lalu generate gagal → baris "yatim" + nomor terlewati.)
+
+### 10.2 Kenapa refresh meng-out login? (bukan demi kecepatan — kini diperbaiki)
+- **Akar masalah:** `App.tsx` menginisialisasi `isLoggedIn = false` dan TIDAK pernah memulihkan
+  sesi dari localStorage saat dimuat, padahal supabase-js sudah menyimpan sesi di browser.
+  Memulihkannya hanya baca localStorage (<1 ms) — **tidak ada pengaruh ke loading**.
+- **Perbaikan (`src/services/auth.ts` + `src/App.tsx`):**
+  - `authService.restoreSession()` baru — saat halaman dimuat, sesi Supabase dibaca dari
+    localStorage → admin **tetap login setelah refresh**.
+  - `handleLogout` kini benar-benar logout: hapus key sesi `sb-*` dari localStorage secara
+    sinkron (jaminan refresh pasca-logout tetap logout, walau koneksi lambat) + revoke token
+    di server (best-effort). Sebelumnya tombol Logout hanya reset state UI — sesi Supabase di
+    browser masih hidup.
+
+### 10.3 Uji browser (build produksi lokal `vite preview`, login admin asli) — semua lulus ✅
+| Cek | Hasil |
+|---|---|
+| Login admin | ✅ Nav menampilkan Logout Admin |
+| **Refresh → masih login** | ✅ Sesi dipulihkan dari localStorage (sebelumnya auto-logout) |
+| Klik Logout → langsung logout | ✅ UI logout seketika, key sesi `sb-*` hilang dari localStorage |
+| **Refresh pasca-logout → tetap logout** | ✅ (sebelumnya sesi muncul lagi) |
+| Alur proposal baru (generate→insert) | ✅ Pesan "Proposal dibuat: 001/PROP/IMKKSA/VIII/2026" tampil, PDF 729.175 byte valid (nomor, tanggal 18 Agustus 2026, penerima 2 baris), baris Supabase no_urut 1, 0 error JS |
+| Fallback field (uji sintetis) | ✅ `Text1/Text2/Text3` tanpa multiline terpetakan; tanpa field → pesan error jelas |
+- Baris uji proposal dihapus (HTTP 204) → tabel `riwayat_download` kembali `[]` (nomor mulai dari 001).
+- Detail teknis logout: `signOut()` bawaan auth-js menghapus sesi lokal HANYA SETELAH panggilan
+  server selesai — kalau pengguna refresh di tengah jalan, sesi tersisa. Solusinya: hapus key
+  `sb-*` langsung (sinkron) lalu revoke server sebagai best-effort.
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -443,4 +493,5 @@ e7953b4  Aktifkan type-check di App.tsx: hapus @ts-nocheck
 ecef937  Perbarui ISI.pdf: tambah info donasi & narahubung, optimasi ukuran (365 KB → 347 KB)
 eee93d6  Perbarui template PDF cover & isi: perbaiki nomor surat terpotong garis batas (Nitro 8)
 0cfa3ed  Optimasi ukuran template PDF: re-save lossless via pdf-lib (COVER 419→399 KB, ISI 371→353 KB)
+<next>   Login tidak logout saat refresh + logout sungguhan + PDF lebih tahan banting (fallback & pesan error)
 ```

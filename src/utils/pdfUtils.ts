@@ -21,15 +21,26 @@ interface CoverFields {
  * - utamakan nama field yang dikenal (nomor_surat, tanggal_surat, tujuan_surat)
  * - kalau template di-export ulang dan nama field berubah (mis. Text1/Text2/Text3),
  *   petakan ulang berdasarkan karakteristik & posisi:
- *   tujuan = field multiline (kotak besar 2 baris),
+ *   tujuan = field multiline ATAU kotak terluas (penerima 2 baris biasanya paling besar),
  *   nomor  = field paling kiri,
  *   tanggal = field paling kanan.
+ * Kalau tetap tidak bisa dipetakan, lempar pesan error yang memberi tahu admin cara
+ * memperbaiki di Nitro 8 (nama field) — bukan error membingungkan.
  */
 function resolveCoverFields(coverForm: PDFForm): CoverFields {
   const textFields = coverForm.getFields().filter((f) => f instanceof PDFTextField) as PDFTextField[]
   const byName = (name: string) => textFields.find((f) => f.getName() === name)
 
-  const tujuan = byName('tujuan_surat') ?? textFields.find((f) => f.isMultiline())
+  const areaOf = (f: PDFTextField) => {
+    const r = f.acroField.getWidgets()[0]?.getRectangle()
+    return r ? r.width * r.height : 0
+  }
+  // Kotak penerima (2 baris) biasanya yang terluas → fallback terakhir untuk tujuan.
+  const tujuan =
+    byName('tujuan_surat') ??
+    textFields.find((f) => f.isMultiline()) ??
+    [...textFields].sort((a, b) => areaOf(b) - areaOf(a))[0]
+
   const sisa = textFields.filter((f) => f !== tujuan)
   const xOf = (f: PDFTextField) => f.acroField.getWidgets()[0]?.getRectangle().x ?? 0
   const [kiri, kanan] = [...sisa].sort((a, b) => xOf(a) - xOf(b))
@@ -37,10 +48,13 @@ function resolveCoverFields(coverForm: PDFForm): CoverFields {
   const nomor = byName('nomor_surat') ?? kiri
   const tanggal = byName('tanggal_surat') ?? kanan
 
-  if (!nomor || !tanggal || !tujuan) {
+  if (!nomor || !tanggal || !tujuan || nomor === tanggal || nomor === tujuan || tanggal === tujuan) {
     throw new Error(
-      '[Proposal PDF] Field cover tidak lengkap. Terdeteksi: ' +
-        textFields.map((f) => f.getName()).join(', '),
+      '[Proposal PDF] Field cover di COVER.pdf tidak lengkap atau berubah nama. ' +
+        'Perbaiki di Nitro 8: klik kanan tiap kotak isian → Properties → beri nama ' +
+        'nomor_surat (kotak nomor surat), tanggal_surat (kotak tanggal), dan ' +
+        'tujuan_surat (kotak penerima, centang Multiline). Terdeteksi: ' +
+        (textFields.map((f) => f.getName()).join(', ') || '(tidak ada field)'),
     )
   }
   return { nomor, tanggal, tujuan }
