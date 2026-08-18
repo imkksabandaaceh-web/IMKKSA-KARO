@@ -335,6 +335,57 @@ Detail uji UI lengkap (login `imkksa01@imkksa.org`):
 
 ---
 
+## ✅ Fase 9 — Perbaikan Garis Batas Nomor Surat + Optimasi Lossless + Uji Nomor 001/002 (18 Agustus 2026)
+
+> Admin memperbaiki template PDF dengan **Nitro 8** (nomor surat yang tadinya terpotong garis batas kini tidak lagi),
+> lalu diminta: update ke build/git, optimasi ukuran lossless, uji coba nomor urut 001 & 002 di browser sungguhan,
+> dan hapus hasil uji agar nomor surat berikutnya mulai dari 001 lagi.
+
+### 9.1 Perbaikan garis batas nomor surat (Nitro 8) — commit `eee93d6`
+- `public/COVER.pdf` & `public/ISI.pdf` diperbarui admin via Nitro 8: **nomor surat tidak lagi terpotong garis batas**.
+- Ukuran naik (COVER 415.983 → 418.531 B, ISI 347.210 → 371.366 B) karena Nitro menyimpan ulang tanpa
+  optimasi pdf-lib sesi sebelumnya.
+- Build → commit `eee93d6` → push → Vercel auto-deploy. Verifikasi live: COVER **418.531** byte, ISI **371.366** byte (identik repo).
+
+### 9.2 Optimasi ukuran lossless via pdf-lib — commit `0cfa3ed`
+- Re-save lossless dengan **pdf-lib** (library yang sama dipakai generate):
+
+  | File | Sebelum | Sesudah | Hemat |
+  |---|---|---|---|
+  | COVER.pdf | 418.531 B | **398.499 B** | −4,8% |
+  | ISI.pdf | 371.366 B | **353.133 B** | −4,9% |
+
+- **Verifikasi kesetaraan (semua lulus ✅):**
+  - Halaman utuh (COVER 2, ISI 5); field form `tujuan_surat`, `nomor_surat`, `tanggal_surat` tetap ada.
+  - Teks template identik (`pdftotext` lama vs baru).
+  - Hasil generate dari template lama vs baru **byte-identik** (SHA-256 sama setelah `/ID` acak dibuang)
+    → posisi field & konten tidak berubah → perbaikan garis batas tetap terjaga.
+- `dist/` MD5 identik `public/`; live: COVER **398.499**, ISI **353.133** byte.
+
+### 9.3 Uji browser sungguhan: nomor urut 001 & 002 — semua lulus ✅
+- Chrome headless via CDP (Node `WebSocket` bawaan, tanpa puppeteer): login admin asli `imkksa01@imkksa.org` →
+  menu Proposal → isi pengirim/penerima 2 baris → klik **PROSES & GENERATE PDF**.
+- **Proposal 001:** baris Supabase `001/PROP/IMKKSA/VIII/2026` (no_urut 1) ✅ · pesan UI *"Proposal dibuat:
+  001/PROP/IMKKSA/VIII/2026"* ✅ · PDF **729.176 byte**, valid %PDF, field cover terisi (nomor 001,
+  tanggal **18 Agustus 2026**, penerima 2 baris) ✅.
+- **Proposal 002:** baris `002/PROP/IMKKSA/VIII/2026` (no_urut 2) ✅ — **penomoran berurutan MAX+1 terbukti**
+  dari tabel kosong.
+- **Instrumentasi:** 1 klik tombol → tepat **1 POST insert** Supabase per proposal (tidak ada submit ganda);
+  0 error JavaScript; 0 exception CDP. Blob PDF di-intersepsi langsung di halaman (hook `URL.createObjectURL`),
+  byte persis hasil browser.
+- **Uji lanjutan (tabel tidak kosong):** 003 → 004 juga berurutan → logika `MAX(no_urut)+1` benar baik dari
+  kosong maupun lanjutan.
+
+### 9.4 Pembersihan: nomor surat kembali mulai dari 001
+- Semua baris uji dihapus dari Supabase (id 16–19, HTTP 204) → tabel `riwayat_download` kembali **`[]`** →
+  proposal berikutnya otomatis bernomor **001**.
+- Artefak uji (skrip CDP, folder `.tmp-uji`, profil Chrome) dihapus; `git status` bersih.
+- Catatan teknis: pada percobaan pertama, pesan sukses UI sempat "terlewat" oleh polling skrip karena render
+  React menumpuk dengan reset form saat generate (pdf-lib memblokir main thread sejenak) — diselesaikan dengan
+  MutationObserver + pemicu baris Supabase sebagai sumber kebenaran.
+
+---
+
 ## 📦 Arsitektur Akhir
 
 | Komponen | Tempat penyimpanan | Keterangan |
@@ -390,4 +441,6 @@ e7953b4  Aktifkan type-check di App.tsx: hapus @ts-nocheck
 5b15393  Perbarui template PDF cover/isi + petakan field form secara otomatis
 18c8727  Beri nama field form di COVER.pdf (nomor_surat, tanggal_surat, tujuan_surat)
 ecef937  Perbarui ISI.pdf: tambah info donasi & narahubung, optimasi ukuran (365 KB → 347 KB)
+eee93d6  Perbarui template PDF cover & isi: perbaiki nomor surat terpotong garis batas (Nitro 8)
+0cfa3ed  Optimasi ukuran template PDF: re-save lossless via pdf-lib (COVER 419→399 KB, ISI 371→353 KB)
 ```
