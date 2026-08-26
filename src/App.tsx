@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
-import LoginForm from './components/LoginForm'
 import { authService } from './services/auth'
+const LoginForm = lazy(() => import('./components/LoginForm'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const APanel = lazy(() => import('./components/APanel'))
 const ProposalView = lazy(() => import('./components/ProposalView'))
+const AlbumGallery = lazy(() => import('./components/GaleriView'))
 import './App.css'
-import AlbumGallery from './components/GaleriView'
 import { umatService } from './services/umat'
 import { compressImage, toImageKitUrl } from './utils/imageUtils'
 
@@ -1806,10 +1806,10 @@ function App() {
                           <td>
                             <div className="pending-docs">
                               {u.photo ? (
-                                <img src={toImageKitUrl(u.photo, 200, true)} alt="Pas Foto" className="doc-thumb" title="Pas Foto — klik untuk detail" onClick={() => setSelectedUmat(u)} />
+                                <img src={toImageKitUrl(u.photo, 200, true)} alt="Pas Foto" className="doc-thumb" loading="lazy" title="Pas Foto — klik untuk detail" onClick={() => setSelectedUmat(u)} />
                               ) : <span className="doc-none">Tanpa foto</span>}
                               {u.kk ? (
-                                <img src={toImageKitUrl(u.kk, 300)} alt="Kartu Keluarga" className="doc-thumb doc-thumb-kk" title="Kartu Keluarga — klik untuk detail" onClick={() => setSelectedUmat(u)} />
+                                <img src={toImageKitUrl(u.kk, 300)} alt="Kartu Keluarga" className="doc-thumb doc-thumb-kk" loading="lazy" title="Kartu Keluarga — klik untuk detail" onClick={() => setSelectedUmat(u)} />
                               ) : null}
                             </div>
                           </td>
@@ -2089,7 +2089,7 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" />}
+                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" />}
                 <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}
@@ -2103,7 +2103,7 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" />}
+                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" />}
                 <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}
@@ -2266,7 +2266,7 @@ function App() {
               <div className="form-attachments">
                 <h4>Lampiran Dokumen: Kartu Keluarga (KK)</h4>
                 {isLoggedIn ? (
-                  <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" />
+                  <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" loading="lazy" />
                 ) : (
                   <div className="kk-locked-box">
                     <div className="kk-locked-content">
