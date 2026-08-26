@@ -7,81 +7,7 @@ const ProposalView = lazy(() => import('./components/ProposalView'))
 import './App.css'
 import AlbumGallery from './components/GaleriView'
 import { umatService } from './services/umat'
-
-const compressImage = (base64: string, maxWidth: number, quality: number): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.src = base64;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        try {
-          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-          resolve(compressedBase64);
-        } catch (e) {
-          resolve(base64);
-        }
-      } else {
-        resolve(base64);
-      }
-    };
-    img.onerror = () => {
-      resolve(base64);
-    };
-  });
-};
-
-const toImageKitUrl = (url: string | undefined | null, width = 800, cropFace = false): string => {
-  if (!url) return '';
-  const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
-  
-  const tr = cropFace ? `tr=w-${width},h-${width},fo-face` : `tr=w-${width},q-80`;
-
-  if (url.includes('ik.imagekit.io')) {
-    const cleanUrl = url.split('?')[0];
-    return `${cleanUrl}?${tr}`;
-  }
-
-  let fileId = '';
-  const lhMatch = url.match(/lh\d+\.googleusercontent\.com\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
-  if (lhMatch) {
-    fileId = lhMatch[1];
-  } else {
-    const driveIdMatch = url.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
-    if (driveIdMatch) {
-      fileId = driveIdMatch[1];
-    } else {
-      const drivePathMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if (drivePathMatch) {
-        fileId = drivePathMatch[1];
-      }
-    }
-  }
-
-  if (fileId && endpoint) {
-    return `${endpoint}/d/${fileId}?${tr}`;
-  }
-
-  if (endpoint && url.includes('https://lh3.googleusercontent.com')) {
-    const cleanUrl = url.split('?')[0];
-    return `${cleanUrl.replace('https://lh3.googleusercontent.com', endpoint)}?${tr}`;
-  }
-
-  return url;
-};
+import { compressImage, toImageKitUrl } from './utils/imageUtils'
 
 const formatDateDevice = (dateStr: string | undefined | null): string => {
   if (!dateStr) return '-';
@@ -574,14 +500,21 @@ function App() {
             galeriAlbum: data.galeriAlbum || prev.galeriAlbum || []
           }
 
-          const isSameUmat = JSON.stringify(prev.umat) === JSON.stringify(mergedContent.umat);
-          const isSamePages = JSON.stringify(prev.pages) === JSON.stringify(mergedContent.pages);
-          const isSameSettings = JSON.stringify(prev.settings) === JSON.stringify(mergedContent.settings);
-          const isSamePengurus = JSON.stringify(prev.pengurus) === JSON.stringify(mergedContent.pengurus);
-          const isSameGaleriAlbum = JSON.stringify(prev.galeriAlbum) === JSON.stringify(mergedContent.galeriAlbum);
-          const isSameGaleri = JSON.stringify(prev.galeri) === JSON.stringify(mergedContent.galeri);
+          // Komparasi ringan: bandingkan jumlah & checksum field penting,
+          // bukan JSON.stringify seluruh objek (yang mahal untuk array besar).
+          const checksum = (obj: any) => {
+            if (!obj) return '';
+            if (Array.isArray(obj)) return `${obj.length}_${obj.map((i: any) => i?.id || i?.judul || '').join(',')}`;
+            return JSON.stringify(obj);
+          };
+          const changed =
+            checksum(prev.settings) !== checksum(mergedContent.settings) ||
+            checksum(prev.pages) !== checksum(mergedContent.pages) ||
+            checksum(prev.pengurus) !== checksum(mergedContent.pengurus) ||
+            checksum(prev.galeri) !== checksum(mergedContent.galeri) ||
+            checksum(prev.galeriAlbum) !== checksum(mergedContent.galeriAlbum);
 
-          if (!isSameUmat || !isSamePages || !isSameSettings || !isSamePengurus || !isSameGaleriAlbum || !isSameGaleri) {
+          if (changed) {
             localStorage.setItem('imkksaSiteContent', JSON.stringify(mergedContent));
             return mergedContent;
           }

@@ -7,7 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.local
@@ -23,16 +26,28 @@ dist-ssr
 *.sln
 *.sw?
 
+# Vercel
 .vercel
-website-imkksa-banda-aceh-sekitar-*.json
-.aider*
-.env
-.env
-.env
-.env
-.env
-.env
-.env
+
+# Environment files
 .env
 .env.local
 .env.*
+!.env.example
+
+# Backup files
+*.bak
+*.backup
+
+# AI tool configs
+.aider*
+.blackboxcli/
+.gemini/
+
+# Google Apps Script (managed in google-script/ folder)
+.clasp.json
+.claspignore
+appsscript.json
+
+# Google OAuth tokens
+website-imkksa-banda-aceh-sekitar-*.json
