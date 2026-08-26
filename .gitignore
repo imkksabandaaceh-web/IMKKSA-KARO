@@ -51,3 +51,7 @@ appsscript.json
 
 # Google OAuth tokens
 website-imkksa-banda-aceh-sekitar-*.json
+
+# Copy/backup source files
+* - Copy.*
+* - Copy.txt
