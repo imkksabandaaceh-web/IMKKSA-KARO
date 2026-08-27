@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import { authService } from './services/auth'
+import BackgroundMusic from './components/BackgroundMusic'
 const LoginForm = lazy(() => import('./components/LoginForm'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const APanel = lazy(() => import('./components/APanel'))
@@ -2404,6 +2405,9 @@ function App() {
         )}
       </footer>
       {renderFormulirPendaftaranModal()}
+
+      {/* Musik latar — dimuat on-demand, tidak memblokir rendering */}
+      <BackgroundMusic />
     </div>
   )
 }
