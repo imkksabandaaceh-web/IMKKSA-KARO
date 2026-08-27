@@ -1602,6 +1602,8 @@ function App() {
                         src={toImageKitUrl(umatForm.photo, 400)}
                         alt="Preview Foto"
                         className="file-preview-img"
+                        width={400}
+                        height={400}
                         style={{ objectFit: 'cover', objectPosition: 'top center' }}
                       />
                       <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, photo: '' })}>Hapus Foto</button>
@@ -1667,7 +1669,7 @@ function App() {
                       {kkMode === 'link' ? (
                         <p style={{ fontSize: '0.85rem', wordBreak: 'break-all', color: '#555' }}>Link tersimpan: {umatForm.kk}</p>
                       ) : (
-                        <img src={toImageKitUrl(umatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
+                        <img src={toImageKitUrl(umatForm.kk, 400)} alt="Preview KK" className="file-preview-img" width={400} height={300} />
                       )}
                       <button type="button" className="btn-remove-file" onClick={() => setUmatForm({ ...umatForm, kk: '' })}>Hapus KK</button>
                     </div>
@@ -1807,10 +1809,10 @@ function App() {
                           <td>
                             <div className="pending-docs">
                               {u.photo ? (
-                                <img src={toImageKitUrl(u.photo, 200, true)} alt="Pas Foto" className="doc-thumb" loading="lazy" title="Pas Foto — klik untuk detail" onClick={() => setSelectedUmat(u)} />
+                                <img src={toImageKitUrl(u.photo, 200, true)} alt="Pas Foto" className="doc-thumb" loading="lazy" width={200} height={200} title="Pas Foto — klik untuk detail" onClick={() => setSelectedUmat(u)} />
                               ) : <span className="doc-none">Tanpa foto</span>}
                               {u.kk ? (
-                                <img src={toImageKitUrl(u.kk, 300)} alt="Kartu Keluarga" className="doc-thumb doc-thumb-kk" loading="lazy" title="Kartu Keluarga — klik untuk detail" onClick={() => setSelectedUmat(u)} />
+                                <img src={toImageKitUrl(u.kk, 300)} alt="Kartu Keluarga" className="doc-thumb doc-thumb-kk" loading="lazy" width={300} height={200} title="Kartu Keluarga — klik untuk detail" onClick={() => setSelectedUmat(u)} />
                               ) : null}
                             </div>
                           </td>
@@ -2030,6 +2032,8 @@ function App() {
                             src={toImageKitUrl(userUmatForm.photo, 400)}
                             alt="Preview Foto"
                             className="file-preview-img"
+                            width={400}
+                            height={400}
                             style={{ objectFit: 'cover', objectPosition: 'top center' }}
                           />
                           <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
@@ -2051,7 +2055,7 @@ function App() {
                       </>
                       {userUmatForm.kk && (
                         <div className="preview-container">
-                          <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="file-preview-img" />
+                          <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="file-preview-img" width={400} height={300} />
                           <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, kk: '' })}>Hapus KK</button>
                         </div>
                       )}
@@ -2090,7 +2094,7 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" />}
+                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" width={400} height={400} />}
                 <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}
@@ -2104,7 +2108,7 @@ function App() {
           <div className="pengurus-grid">
             {pengurusList.map(p => (
               <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" />}
+                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" width={400} height={400} />}
                 <h3>{p.jabatan}</h3><p>{p.nama}</p>
               </div>
             ))}
@@ -2120,7 +2124,7 @@ function App() {
             <label>Foto</label><input type="file" accept="image/*" onChange={handlePengurusPhoto} />
             {pengurusForm.photo && (
               <div className="preview-container">
-                <img src={toImageKitUrl(pengurusForm.photo, 200, true)} alt="Preview Foto" className="file-preview-img" />
+                <img src={toImageKitUrl(pengurusForm.photo, 200, true)} alt="Preview Foto" className="file-preview-img" width={200} height={200} />
                 <button type="button" className="btn-remove-file" onClick={() => setPengurusForm({ ...pengurusForm, photo: '' })}>Hapus Foto</button>
               </div>
             )}
@@ -2189,7 +2193,7 @@ function App() {
           <div className="form-print-area">
             {/* Kop Surat */}
             <div className="kop-surat">
-              <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" className="kop-logo" />
+              <img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" className="kop-logo" width={200} height={200} />
               <div className="kop-text">
                 <h2>IKATAN MASYARAKAT KARO KRISTEN SADA ARIH BANDA ACEH SEKITAR</h2>
                 <p>Sekretariat: Banda Aceh, Prov. Aceh | Email: imkksabandaaceh@gmail.com</p>
@@ -2252,6 +2256,8 @@ function App() {
                   <img
                     src={toImageKitUrl(selectedUmat.photo, 400)}
                     alt="Pas Foto"
+                    width={400}
+                    height={400}
                     style={{ objectFit: 'cover', objectPosition: 'top center' }}
                   />
                 ) : (
@@ -2267,7 +2273,7 @@ function App() {
               <div className="form-attachments">
                 <h4>Lampiran Dokumen: Kartu Keluarga (KK)</h4>
                 {isLoggedIn ? (
-                  <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" loading="lazy" />
+                  <img src={toImageKitUrl(selectedUmat.kk, 800)} alt="Kartu Keluarga" className="attachment-kk" loading="lazy" width={800} height={600} />
                 ) : (
                   <div className="kk-locked-box">
                     <div className="kk-locked-content">
@@ -2311,7 +2317,7 @@ function App() {
   if (isLoading) {
     return (
       <div className="loading-screen">
-        <div className="loading-logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" /></div>
+        <div className="loading-logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" width={150} height={150} /></div>
         <p>Membuka situs IMKKSA Banda Aceh Sekitar...</p>
       </div>
     )
@@ -2358,7 +2364,7 @@ function App() {
   return (
     <div className="app-container" style={appContainerStyle}>
       <header className="header" style={headerStyle}>
-        <div className="logo-container"><img src={siteContent.settings.logo || "/LOGO_KARO.jpg"} alt="Logo IMKKSA" /></div>
+        <div className="logo-container"><img src={siteContent.settings.logo || "/LOGO_KARO.jpg"} alt="Logo IMKKSA" width={200} height={200} loading="eager" /></div>
         <h1>{siteContent.settings.title}</h1>
       </header>
       <nav className="navbar">

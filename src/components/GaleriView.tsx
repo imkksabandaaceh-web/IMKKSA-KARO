@@ -192,6 +192,8 @@ const Lightbox: React.FC<LightboxProps> = ({ files, startIndex, onClose }) => {
         <img
           src={file.fullUrl}
           alt={file.name}
+          width={1200}
+          height={800}
           style={{
             maxWidth: '90vw', maxHeight: '80vh',
             objectFit: 'contain', borderRadius: '8px',
@@ -565,6 +567,8 @@ const AlbumGallery: React.FC<AlbumGalleryProps> = ({ folderId, folderUrl, script
                   src={file.thumbnailUrl}
                   alt={file.name}
                   loading="lazy"
+                  width={400}
+                  height={400}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   onError={e => {
                     // Fallback ke Google Drive thumbnail langsung

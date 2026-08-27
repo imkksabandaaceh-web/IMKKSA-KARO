@@ -24,6 +24,9 @@ export default function Pengurus({ data }: Props) {
               src={toImageKitUrl(p.photo || '/LOGO_KARO.jpg', 400, true)}
               alt={p.nama}
               className="pengurus-photo"
+              width={400}
+              height={400}
+              loading="lazy"
             />
 
             <h3>{p.jabatan}</h3>
