@@ -28,6 +28,15 @@ function doGet(e) {
   var params = (e && e.parameter) || {};
   var action = params.action;
 
+  // ── Warmup endpoint: panggil dari frontend saat admin login untuk
+  //    "menghangatkan" Google Apps Script sebelum request upload gambar.
+  //    Tanpa ini, request pertama (cold start) sering timeout/gagal CORS.
+  if (params.warmup === '1') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: true, warmed: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // ── TAMBAHKAN BLOK INI ── (taruh di bagian paling atas if/else)
   if (params.action === 'listFolder') {
     var folderId = params.folderId;
@@ -355,13 +364,35 @@ function uploadBase64ToFolder(base64Data, fileName, folder) {
     var blob = Utilities.newBlob(decoded, mimeType, fullFileName);
     
     var file = folder.createFile(blob);
+    if (!file) {
+      throw new Error("Gagal membuat file di Google Drive (createFile returned null)");
+    }
+    
     try {
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     } catch (shareErr) {
-      Logger.log("Gagal share file: " + shareErr.toString());
+      Logger.log("Gagal share file (non-fatal): " + shareErr.toString());
     }
     
-    var url = "https://lh3.googleusercontent.com/d/" + file.getId();
+    // Tunggu sebentar agar file benar-benar tersedia di Google Drive.
+    // URL lh3.googleusercontent.com bisa butuh beberapa detik untuk propagate
+    // setelah file baru dibuat — tanpa delay ini, client akan dapat
+    // "gambar belum tersinkronisasi ke google drive" pada percobaan kedua.
+    Utilities.sleep(1500);
+    
+    // Verifikasi file benar-benar ada dan bisa diakses
+    var fileId = file.getId();
+    try {
+      var verifyFile = DriveApp.getFileById(fileId);
+      if (!verifyFile) {
+        throw new Error("File tidak ditemukan setelah upload");
+      }
+    } catch (verifyErr) {
+      Logger.log("Verifikasi file gagal: " + verifyErr.toString());
+      throw new Error("File berhasil diupload tapi belum tersedia di Drive: " + verifyErr.toString());
+    }
+    
+    var url = "https://lh3.googleusercontent.com/d/" + fileId;
     return { success: true, url: url };
   } catch (e) {
     return { success: false, error: e.toString() };

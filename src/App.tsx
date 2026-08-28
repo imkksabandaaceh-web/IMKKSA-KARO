@@ -295,18 +295,35 @@ const readFileAsBase64 = (file: File): Promise<string> => {
 };
 
 const uploadBase64ToDrive = async (base64: string, folder?: string): Promise<string> => {
-  const res = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({
-      action: 'uploadImage',
-      data: { base64, ...(folder ? { folder } : {}) }
-    })
-  });
-  const result = await res.json();
-  if (result.success && result.url) return result.url;
-  throw new Error(result.error || 'Upload gagal, tidak ada URL yang dikembalikan.');
+  // Retry otomatis untuk mengatasi Google Apps Script cold start
+  // (server tidur ~5 menit → request pertama sering timeout/gagal)
+  const maxRetries = 2;
+  const delayMs = 2000;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'uploadImage',
+          data: { base64, ...(folder ? { folder } : {}) }
+        })
+      });
+      const result = await res.json();
+      if (result.success && result.url) return result.url;
+      throw new Error(result.error || 'Upload gagal, tidak ada URL yang dikembalikan.');
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[uploadBase64ToDrive] Percobaan ${attempt + 1}/${maxRetries + 1} gagal:`, lastError.message);
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delayMs * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError!;
 };
 
 function App() {
@@ -749,7 +766,14 @@ function App() {
   useEffect(() => {
     let active = true
     authService.restoreSession().then((ok) => {
-      if (active && ok) setIsLoggedIn(true)
+      if (active && ok) {
+        setIsLoggedIn(true)
+        // Pre-warm Google Apps Script agar request berikutnya (upload gambar, dll.)
+        // tidak mengalami "cold start" (server tidur → timeout → Failed to fetch).
+        // cukup panggil GET ringan — tidak perlu memproses response.
+        fetch(`${SCRIPT_URL}?t=${Date.now()}&warmup=1`, { method: 'GET', mode: 'no-cors' })
+          .catch(() => {}); // fire-and-forget, abaikan error
+      }
     })
     return () => {
       active = false
