@@ -1400,7 +1400,7 @@ function App() {
                     {/* Header album */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
                       <div>
-                        <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--primary-color)' }}>
+                        <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: 'var(--heading-color, #2c3e50)' }}>
                           📁 {album.judul}
                         </h3>
                         {album.keterangan && (
