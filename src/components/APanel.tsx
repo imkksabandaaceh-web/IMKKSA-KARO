@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { compressImage, toImageKitUrl } from '../utils/imageUtils';
 
 // --- Tipe ini harus selalu sama persis dengan interface SiteSettings di App.tsx ---
@@ -14,6 +14,7 @@ interface SiteSettings {
   headerFontFamily?: string;
   headerFontSize?: string;
   headerBgImage?: string;
+  headerBgImages?: string[];
   headerBgOverlay?: string;
   navFontFamily?: string;
   navFontSize?: string;
@@ -175,7 +176,9 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
   const [headerFontSize, setHeaderFontSize] = useState(settings.headerFontSize || 'clamp(1.8rem, 6vw, 3.2rem)');
   const [primaryColor, setPrimaryColor] = useState(settings.primaryColor || '#2e7d32');
   const [headerBgImage, setHeaderBgImage] = useState(settings.headerBgImage || '');
+  const [headerBgImages, setHeaderBgImages] = useState<string[]>(settings.headerBgImages || []);
   const [headerBgOverlay, setHeaderBgOverlay] = useState(settings.headerBgOverlay || 'rgba(0, 0, 0, 0.25)');
+  const slideshowInputRef = useRef<HTMLInputElement>(null);
 
   const [navBgColor, setNavBgColor] = useState(settings.navBgColor || '#2f5d50');
   const [navTextColor, setNavTextColor] = useState(settings.navTextColor || '#ffffff');
@@ -279,6 +282,43 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
     setMessage({ type: 'success', text: 'Gambar latar header dihapus. Header kembali polos.' });
   };
 
+  // --- Slideshow handlers ---
+  const handleSlideshowUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploadingHeaderBg(true);
+    setMessage(null);
+    try {
+      const newUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const url = await uploadImage(files[i], 1600, 0.75);
+        newUrls.push(url);
+      }
+      setHeaderBgImages(prev => [...prev, ...newUrls]);
+      setMessage({ type: 'success', text: `${newUrls.length} gambar slideshow berhasil diunggah!` });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: 'Gagal mengunggah gambar slideshow: ' + (err?.message || 'Error tidak diketahui') });
+    } finally {
+      setIsUploadingHeaderBg(false);
+      // Reset input file agar bisa upload lagi
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveSlideshowImage = (index: number) => {
+    setHeaderBgImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMoveSlideshowImage = (index: number, direction: 'up' | 'down') => {
+    setHeaderBgImages(prev => {
+      const arr = [...prev];
+      const swapIndex = direction === 'up' ? index - 1 : index + 1;
+      if (swapIndex < 0 || swapIndex >= arr.length) return arr;
+      [arr[index], arr[swapIndex]] = [arr[swapIndex], arr[index]];
+      return arr;
+    });
+  };
+
   const handleSaveAll = async () => {
     setIsSaving(true);
     setMessage(null);
@@ -291,6 +331,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
       headerFontSize,
       primaryColor,
       headerBgImage,
+      headerBgImages,
       headerBgOverlay,
       navBgColor,
       navTextColor,
@@ -467,6 +508,9 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
 
           <div>
             <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🌄 Gambar Latar Header (opsional)</label>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 0, marginBottom: '12px' }}>
+              Upload satu gambar untuk background statis, atau beberapa gambar untuk slideshow otomatis (ganti tiap 5 detik).
+            </p>
             <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
               <input type="file" accept="image/*" onChange={handleHeaderBgUpload} disabled={isUploadingHeaderBg} />
               {isUploadingHeaderBg && <span style={{ color: '#64748b' }}>⏳ Mengunggah...</span>}
@@ -490,6 +534,58 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
                 />
               </div>
             )}
+
+            {/* --- Slideshow management --- */}
+            <div style={{ marginTop: '16px', padding: '12px', background: '#f0f7f0', borderRadius: '8px', borderLeft: '4px solid #2e7d32' }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>🖼️ Slideshow Header (beberapa gambar bergantian)</label>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 0, marginBottom: '10px' }}>
+                Upload banyak gambar sekaligus. Urutan bisa diatur. Slideshow otomatis berganti tiap 5 detik.
+              </p>
+              <div
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#2e7d32'; e.currentTarget.style.background = '#e8f5e9'; }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#fff'; }}
+                onDrop={e => {
+                  e.preventDefault();
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.background = '#fff';
+                  const files = e.dataTransfer.files;
+                  if (files.length > 0) {
+                    // Trigger the same upload handler with a synthetic event-like approach
+                    const dt = new DataTransfer();
+                    for (let i = 0; i < files.length; i++) dt.items.add(files[i]);
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.files = dt.files;
+                    // We can't fake onChange, so call handler directly
+                    handleSlideshowUpload({ target: { files, value: '' } } as any);
+                  }
+                }}
+                onClick={() => { if (!isUploadingHeaderBg) slideshowInputRef.current?.click(); }}
+                style={{
+                  border: '2px dashed #cbd5e1', borderRadius: '8px', padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
+                  background: '#fff', transition: 'all 0.2s ease', marginBottom: '10px',
+                }}
+              >
+                <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>📁</div>
+                <div style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>Klik untuk pilih gambar, atau seret ke sini</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>Bisa pilih banyak gambar sekaligus (Ctrl+Klik atau drag)</div>
+                {isUploadingHeaderBg && <div style={{ color: '#64748b', marginTop: '8px' }}>⏳ Mengunggah gambar...</div>}
+              </div>
+              <input ref={slideshowInputRef} type="file" accept="image/*" multiple onChange={handleSlideshowUpload} disabled={isUploadingHeaderBg} style={{ display: 'none' }} />
+              {headerBgImages.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {headerBgImages.map((img, i) => (
+                    <div key={`slide-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                      <img src={toImageKitUrl(img, 100)} alt={`Slide ${i + 1}`} style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <span style={{ fontSize: '0.85rem', color: '#555', flex: 1 }}>Slide {i + 1}</span>
+                      <button type="button" onClick={() => handleMoveSlideshowImage(i, 'up')} disabled={i === 0} style={{ padding: '4px 8px', border: '1px solid #ccc', borderRadius: '4px', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.4 : 1, background: '#fff', fontSize: '0.8rem' }}>↑</button>
+                      <button type="button" onClick={() => handleMoveSlideshowImage(i, 'down')} disabled={i === headerBgImages.length - 1} style={{ padding: '4px 8px', border: '1px solid #ccc', borderRadius: '4px', cursor: i === headerBgImages.length - 1 ? 'not-allowed' : 'pointer', opacity: i === headerBgImages.length - 1 ? 0.4 : 1, background: '#fff', fontSize: '0.8rem' }}>↓</button>
+                      <button type="button" onClick={() => handleRemoveSlideshowImage(i)} style={{ padding: '4px 10px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -757,26 +853,43 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
             textAlign: 'center',
             padding: '30px 15px',
             backgroundColor: '#ffffff',
-            backgroundImage: headerBgImage ? `linear-gradient(${headerBgOverlay}, ${headerBgOverlay}), url(${toImageKitUrl(headerBgImage, 1920)})` : undefined,
+            backgroundImage: headerBgImage && headerBgImages.length === 0 ? `linear-gradient(${headerBgOverlay}, ${headerBgOverlay}), url(${toImageKitUrl(headerBgImage, 1920)})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             borderBottom: `4px solid ${secondaryColor}`,
             borderRadius: '8px 8px 0 0',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          {logoUrl && <img src={logoUrl} alt="Preview logo" style={{ height: '60px', marginBottom: '10px', borderRadius: '50%', objectFit: 'cover' }} />}
-          <h1
-            style={{
-              margin: 0,
-              fontFamily: headerFontFamily,
-              fontSize: headerFontSize,
-              color: headerBgImage ? '#ffffff' : primaryColor,
-              textTransform: 'uppercase',
-              textShadow: headerBgImage ? '0 2px 8px rgba(0,0,0,0.7)' : undefined,
-            }}
-          >
-            {siteTitle}
-          </h1>
+          {/* Slideshow preview */}
+          {headerBgImages.length > 0 && headerBgImages.map((img, i) => (
+            <div
+              key={`preview-slide-${i}`}
+              style={{
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                backgroundImage: `linear-gradient(${headerBgOverlay}, ${headerBgOverlay}), url(${toImageKitUrl(img, 1920)})`,
+                backgroundSize: 'cover', backgroundPosition: 'center',
+                opacity: i === 0 ? 1 : 0,
+                transition: 'opacity 1s ease-in-out',
+              }}
+            />
+          ))}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {logoUrl && <img src={logoUrl} alt="Preview logo" style={{ height: '60px', marginBottom: '10px', borderRadius: '50%', objectFit: 'cover' }} />}
+            <h1
+              style={{
+                margin: 0,
+                fontFamily: headerFontFamily,
+                fontSize: headerFontSize,
+                color: (headerBgImage || headerBgImages.length > 0) ? '#ffffff' : primaryColor,
+                textTransform: 'uppercase',
+                textShadow: (headerBgImage || headerBgImages.length > 0) ? '0 2px 8px rgba(0,0,0,0.7)' : undefined,
+              }}
+            >
+              {siteTitle}
+            </h1>
+          </div>
         </div>
 
         <div style={{ backgroundColor: navBgColor, padding: '12px 16px', textAlign: 'center', borderRadius: '0 0 8px 8px' }}>

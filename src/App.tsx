@@ -139,6 +139,7 @@ interface SiteSettings {
   headerFontFamily?: string;
   headerFontSize?: string;
   headerBgImage?: string;    // gambar latar belakang header (opsional)
+  headerBgImages?: string[]; // kumpulan gambar latar belakang header untuk slideshow
   headerBgOverlay?: string;  // overlay gelap di atas gambar header supaya judul tetap terbaca
   navFontFamily?: string;
   navFontSize?: string;
@@ -424,6 +425,19 @@ function App() {
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [activeTab])
+
+  // ── Slideshow header ─────────────────────────────────────────────────
+  const [slideshowIndex, setSlideshowIndex] = useState(0)
+
+  // Auto-putar slideshow header (5 detik per gambar, crossfade)
+  const slideshowImages = siteContent.settings.headerBgImages || [];
+  useEffect(() => {
+    if (slideshowImages.length <= 1) return;
+    const timer = setInterval(() => {
+      setSlideshowIndex(prev => (prev + 1) % slideshowImages.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slideshowImages.length]);
 
   // ── Menu publik & tab yang disembunyikan via A.Panel ────────────────────
   const navItems = [
@@ -2377,19 +2391,54 @@ function App() {
     ['--button-text-color' as any]: s.buttonTextColor || '',
   };
 
-  const headerStyle: React.CSSProperties = s.headerBgImage ? {
-    // Gambar latar header disajikan lewat ImageKit (proxy + transformasi),
-    // supaya tetap tajam tapi ukuran unduhannya kecil di HP.
-    backgroundImage: `linear-gradient(${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}, ${s.headerBgOverlay || 'rgba(0,0,0,0.25)'}), url(${toImageKitUrl(s.headerBgImage, 1920)})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
+  const overlayColor = s.headerBgOverlay || 'rgba(0,0,0,0.25)';
+
+  // Slideshow: gunakan headerBgImages jika ada, fallback ke headerBgImage tunggal
+  const hasSlideshow = slideshowImages.length > 1;
+  const singleBgImage = s.headerBgImage;
+
+  const headerStyle: React.CSSProperties = (hasSlideshow || singleBgImage) ? {
+    position: 'relative',
+    overflow: 'hidden',
   } : {};
 
   return (
     <div className="app-container" style={appContainerStyle}>
       <header className="header" style={headerStyle}>
+        {/* Slideshow background layers */}
+        {hasSlideshow && slideshowImages.map((img, i) => (
+          <div
+            key={`slide-${i}`}
+            className={`header-slideshow-slide${i === slideshowIndex ? ' active' : ''}`}
+            style={{
+              backgroundImage: `linear-gradient(${overlayColor}, ${overlayColor}), url(${toImageKitUrl(img, 1920)})`,
+            }}
+          />
+        ))}
+        {/* Fallback: single background image (mode lama) */}
+        {!hasSlideshow && singleBgImage && (
+          <div
+            className="header-slideshow-slide active"
+            style={{
+              backgroundImage: `linear-gradient(${overlayColor}, ${overlayColor}), url(${toImageKitUrl(singleBgImage, 1920)})`,
+            }}
+          />
+        )}
         <div className="logo-container"><img src={siteContent.settings.logo || "/LOGO_KARO.jpg"} alt="Logo IMKKSA" width={200} height={200} loading="eager" /></div>
         <h1>{siteContent.settings.title}</h1>
+        {/* Dot navigation for slideshow */}
+        {hasSlideshow && (
+          <div className="header-slideshow-dots">
+            {slideshowImages.map((_, i) => (
+              <button
+                key={`dot-${i}`}
+                className={`header-slideshow-dot${i === slideshowIndex ? ' active' : ''}`}
+                onClick={() => setSlideshowIndex(i)}
+                aria-label={`Slide ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </header>
       <nav className="navbar">
         <div className="mobile-menu-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? '✕' : '☰'} Menu</div>
