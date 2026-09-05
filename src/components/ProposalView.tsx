@@ -5,7 +5,7 @@
 // - Pengunjung umum: hanya melihat daftar & mengunduh PDF yang sudah dibuat.
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
-import { generateProposalPdf, downloadPdfBytes, type ProposalPdfData } from '../utils/pdfUtils';
+import type { ProposalPdfData } from '../utils/pdfUtils';
 
 interface ProposalRow {
   id: number;
@@ -120,6 +120,9 @@ export default function ProposalView({ isLoggedIn }: ProposalViewProps) {
   };
 
   const doGenerate = async (data: ProposalPdfData) => {
+    // Dynamic import: library PDF (pdf-lib + fontkit, ~1.1 MB) hanya dimuat
+    // saat tombol generate/unduh ditekan, bukan saat membuka menu Proposal.
+    const { generateProposalPdf, downloadPdfBytes } = await import('../utils/pdfUtils');
     const bytes = await generateProposalPdf(data);
     const fileName = `Proposal_${data.nomorSurat.replace(/[\/\s]/g, '_')}.pdf`;
     downloadPdfBytes(bytes, fileName);

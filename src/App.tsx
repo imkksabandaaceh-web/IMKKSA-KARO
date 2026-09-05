@@ -365,10 +365,9 @@ function App() {
     return DEFAULT_CONTENT
   })
 
-  // Langsung tampil jika ada cache localStorage, fetch GScript di background
-  const [isLoading, setIsLoading] = useState(() => {
-    return !localStorage.getItem('imkksaSiteContent')
-  })
+  // PR-1 (temuan AGY): tidak ada lagi layar loading yang memblokir render pertama.
+  // Konten langsung tampil dari cache localStorage / DEFAULT_CONTENT (instan),
+  // lalu fetchData() di bawah memperbaruinya di latar belakang (silent refresh).
 
   // Editor states
   const [editTitle, setEditTitle] = useState('')
@@ -558,8 +557,6 @@ function App() {
         console.error("Gagal mengambil data dari Google Drive:", error);
         setFetchError(error instanceof Error ? error.message : String(error));
       }
-    } finally {
-      if (!isSilent) setIsLoading(false)
     }
   }
 
@@ -2352,14 +2349,6 @@ function App() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-logo-container"><img src="/LOGO_KARO.jpg" alt="Logo IMKKSA" width={150} height={150} /></div>
-        <p>Membuka situs IMKKSA Banda Aceh Sekitar...</p>
-      </div>
-    )
-  }
 
   // --- Pengaturan tema dari A.Panel diterapkan di sini ---
   const s = siteContent.settings;

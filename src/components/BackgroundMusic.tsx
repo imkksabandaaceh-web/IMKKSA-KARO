@@ -11,9 +11,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  *     berikutnya langsung melanjutkan sesuai keinginan user.
  */
 
-// OGG: kualitas lebih baik di bitrate yang sama (Chrome, Firefox, Edge)
-// MP3: fallback untuk Safari yang tidak support OGG
-const AUDIO_OGG = '/1Mejuah-juah.ogg';
+// Satu format saja: MP3 — didukung semua browser modern (Chrome, Firefox, Edge, Safari).
+// Versi OGG dihapus untuk menghemat ~556 KB penyimpanan hosting.
 const AUDIO_MP3 = '/1Mejuah-juah.mp3';
 const STORAGE_KEY = 'imkksa_bgmusic';
 
@@ -39,18 +38,10 @@ export default function BackgroundMusic() {
   const [state, setState] = useState<BgMusicState>(loadState);
 
 
-  // Deteksi apakah browser mendukung OGG (Chrome, Firefox, Edge = yes; Safari = no)
-  const supportsOgg = useRef(false);
-  useEffect(() => {
-    const el = document.createElement('audio');
-    supportsOgg.current = !!(el.canPlayType && el.canPlayType('audio/ogg; codecs="vorbis"').replace('no', ''));
-  }, []);
-
   // Buat elemen <audio> secara manual agar kita bisa mengontrol preload
   useEffect(() => {
     const audio = new Audio();
-    // Pilih format: OGG untuk browser modern, MP3 untuk Safari
-    audio.src = supportsOgg.current ? AUDIO_OGG : AUDIO_MP3;
+    audio.src = AUDIO_MP3;
     audio.loop = true;
     audio.preload = 'none';   // ← kunci: jangan auto-download
     audio.volume = state.muted ? 0 : 0.35;
