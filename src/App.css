@@ -284,6 +284,13 @@ h1, h2, h3 {
   font-size: var(--nav-font-size);
   letter-spacing: 0.8px;
   text-transform: uppercase;
+  /* Label menu bisa jadi 1 baris atau 2 baris saat ruang navbar sempit.
+     Semua item tingginya sama (stretch) → teks dirata-tengahkan secara
+     horizontal & vertikal supaya label 1 baris tidak menggantung di atas. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .nav-links > li:hover, .nav-links > li.active {
@@ -753,7 +760,8 @@ button {
     width: 100%;
     padding: 15px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
-    text-align: left;
+    text-align: center;
+    justify-content: center;
   }
 
   .nav-links > li.active::after {
