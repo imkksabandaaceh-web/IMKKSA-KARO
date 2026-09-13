@@ -692,10 +692,25 @@ button {
 }
 
 /* RESPONSIVE DESIGN CONSOLIDATED */
-@media (max-width: 1024px) {
+@media (max-width: 1150px) {
   .nav-links > li {
-    padding: 15px;
-    font-size: 0.85rem;
+    /* Rapatkan sedikit padding kiri-kanan & font pada layar sedang/sempit.
+       Tanpa ini, 8 item menu (mode admin: + ⚙️ A.Panel + Logout) tidak muat
+       dalam satu baris di lebar 769-801px dan 1025-1127px, sehingga item paling
+       kanan terpotong (html/body memakai overflow-x: hidden).
+       Breakpoint dinaikkan 1024px -> 1150px agar tidak ada zona kosong. */
+    padding: 15px 12px;
+    font-size: 0.83rem;
+  }
+}
+
+/* Layar 769-900px adalah rentang paling mepet: belum masuk menu mobile (≤768px),
+   tapi 8 item menu (mode admin) hampir memenuhi lebar layar. Rapatkan lagi supaya
+   masih ada sisa ruang, jadi menu tidak bergantung pada pembulatan lebar huruf. */
+@media (min-width: 769px) and (max-width: 900px) {
+  .nav-links > li {
+    padding: 15px 10px;
+    font-size: 0.82rem;
   }
 }
 
