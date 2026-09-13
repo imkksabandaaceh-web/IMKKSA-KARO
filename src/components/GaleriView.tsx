@@ -31,8 +31,8 @@ const IMAGEKIT_ENDPOINT = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | un
 const toImageKitUrl = (fileId: string, width = 800): string => {
   if (IMAGEKIT_ENDPOINT) {
     const googleThumbUrl = `/d/${fileId}`;
-    // Format: https://ik.imagekit.io/USERNAME/d/FILE_ID?tr=w-800,q-80
-    return `${IMAGEKIT_ENDPOINT}${googleThumbUrl}?tr=w-${width},q-80`;
+    // Format: https://ik.imagekit.io/USERNAME/d/FILE_ID?tr=w-800,q-80,f-auto
+    return `${IMAGEKIT_ENDPOINT}${googleThumbUrl}?tr=w-${width},q-80,f-auto`;
   }
   // Fallback lintas-browser menggunakan direct thumbnail Google Drive
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;

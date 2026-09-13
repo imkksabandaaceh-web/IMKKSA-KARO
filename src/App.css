@@ -866,7 +866,7 @@ button {
 }
 .pengurus-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 20px;
   justify-content: center;   /* grid rata tengah */
   justify-items: center;     /* setiap card rata tengah */
@@ -875,17 +875,20 @@ button {
 }
 
 .pengurus-card {
+  position: relative;
   background: #fff;
   border-radius: 8px;
   padding: 15px;
   text-align: center;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  width: 180px;              /* fix lebar card agar konsisten */
+  width: 100%;
+  max-width: 220px;
+  box-sizing: border-box;
 }
 
-.pengurus-card:hover {
-  transform: translateY(-5px) scale(1.05);
+.pengurus-card:not(.is-editing):hover {
+  transform: translateY(-5px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.15);
 }
 
@@ -899,8 +902,45 @@ button {
   transition: transform 0.3s ease;
 }
 
-.pengurus-card:hover .pengurus-photo {
-  transform: scale(1.1);
+.pengurus-card:not(.is-editing):hover .pengurus-photo {
+  transform: scale(1.05);
+}
+
+.btn-card-edit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #f1f5f9;
+  color: #1d4ed8;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.2s ease;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.btn-card-edit:hover {
+  background: #1d4ed8;
+  color: #ffffff;
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 4px rgba(29,78,216,0.3);
+}
+
+.pengurus-card.is-editing {
+  max-width: 280px;
+  transform: none !important;
+  box-shadow: 0 8px 24px rgba(29, 78, 216, 0.18);
+  border: 2px solid #3b82f6;
+  text-align: left;
+  padding: 16px;
+  z-index: 5;
 }
 
 /* Badges for member status */

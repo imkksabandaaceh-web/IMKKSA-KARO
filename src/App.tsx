@@ -60,7 +60,7 @@ const processHtmlContent = (htmlContent: string): string => {
 
       if (isImage) {
         if (fileId && endpoint) {
-          href = `${endpoint}/d/${fileId}?tr=w-800,q-80`;
+          href = `${endpoint}/d/${fileId}?tr=w-800,q-80,f-auto`;
         }
         
         const img = doc.createElement('img');
@@ -99,7 +99,7 @@ const processHtmlContent = (htmlContent: string): string => {
         }
 
         if (fileId) {
-          img.setAttribute('src', `${endpoint}/d/${fileId}?tr=w-800,q-80`);
+          img.setAttribute('src', `${endpoint}/d/${fileId}?tr=w-800,q-80,f-auto`);
         }
       });
     }
@@ -380,6 +380,24 @@ function App() {
     nama: '',
     photo: ''
   })
+  const [editingPengurusId, setEditingPengurusId] = useState<string | null>(null);
+  const [editPengurusForm, setEditPengurusForm] = useState<{
+    id: string;
+    jabatan: string;
+    nama: string;
+    currentPhoto: string;
+    newPhotoBase64: string | null;
+    newPhotoPreview: string | null;
+  }>({
+    id: '',
+    jabatan: '',
+    nama: '',
+    currentPhoto: '',
+    newPhotoBase64: null,
+    newPhotoPreview: null
+  });
+  const [isUpdatingPengurus, setIsUpdatingPengurus] = useState(false);
+  const [isSavingNewPengurus, setIsSavingNewPengurus] = useState(false);
 
   // Galeri Album states (folder Google Drive)
   const [albumJudul, setAlbumJudul] = useState('')
@@ -1073,62 +1091,232 @@ function App() {
     }
   }
 
-  const handleSavePengurus = async () => {
-    if (!pengurusForm.nama) { alert('Nama pengurus harus diisi.'); return; }
-    
-    let photoUrl = pengurusForm.photo || '';
-    
-    // Jika foto adalah base64 data, upload ke Google Drive terlebih dahulu
-    if (photoUrl && photoUrl.startsWith('data:image')) {
-      try {
-        const res = await fetch(SCRIPT_URL, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({
-            action: 'uploadImage',
-            data: { base64: photoUrl }
-          })
-        });
-        const result = await res.json();
-        if (result.success && result.url) {
-          photoUrl = result.url;
-        } else {
-          console.error("Gagal unggah foto pengurus ke Drive:", result.error);
-          alert("Gagal mengunggah foto pengurus ke Google Drive: " + (result.error || "Error tidak diketahui"));
-          return;
-        }
-      } catch (err) {
-        console.error("Error upload foto pengurus:", err);
-        alert("Gagal mengunggah foto pengurus: " + (err instanceof Error ? err.message : String(err)));
-        return;
-      }
+  const handleStartEditPengurus = (p: PengurusRecord) => {
+    setEditingPengurusId(p.id);
+    setEditPengurusForm({
+      id: p.id,
+      jabatan: p.jabatan || '',
+      nama: p.nama || '',
+      currentPhoto: p.photo || '',
+      newPhotoBase64: null,
+      newPhotoPreview: null
+    });
+  };
+
+  const handleCancelEditPengurus = () => {
+    setEditingPengurusId(null);
+    setEditPengurusForm({
+      id: '',
+      jabatan: '',
+      nama: '',
+      currentPhoto: '',
+      newPhotoBase64: null,
+      newPhotoPreview: null
+    });
+  };
+
+  const handleEditPengurusPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        const compressed = await compressImage(base64, 400, 0.7);
+        setEditPengurusForm(prev => ({
+          ...prev,
+          newPhotoBase64: compressed,
+          newPhotoPreview: compressed
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpdatePengurus = async (id: string) => {
+    if (!editPengurusForm.nama.trim()) {
+      alert('Nama pengurus harus diisi.');
+      return;
+    }
+    if (!editPengurusForm.jabatan.trim()) {
+      alert('Jabatan pengurus harus diisi.');
+      return;
     }
 
-    const newPengurus: PengurusRecord = { 
-      ...pengurusForm, 
-      photo: photoUrl, 
-      id: Date.now().toString() 
-    };
-    const updatedPengurus = [...(siteContent.pengurus || []).filter(p => p.jabatan !== pengurusForm.jabatan), newPengurus];
-    const newContent = {
-      ...siteContent,
-      pengurus: updatedPengurus,
-      settings: { ...siteContent.settings, pengurusRaw: JSON.stringify(updatedPengurus) }
-    };
-    setSiteContent(newContent);
-    localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+    setIsUpdatingPengurus(true);
     try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateContent', data: newContent }),
+      // Jika upload foto baru dikosongkan saat edit, foto lama tetap dipakai (jangan sampai foto hilang)
+      let finalPhotoUrl = editPengurusForm.currentPhoto || '';
+
+      if (editPengurusForm.newPhotoBase64) {
+        try {
+          const uploadedUrl = await uploadBase64ToDrive(editPengurusForm.newPhotoBase64, 'pengurus');
+          if (uploadedUrl) {
+            finalPhotoUrl = uploadedUrl;
+          }
+        } catch (uploadErr) {
+          console.error("Gagal unggah foto pengurus baru ke Drive:", uploadErr);
+          alert("Gagal mengunggah foto baru ke Google Drive: " + (uploadErr instanceof Error ? uploadErr.message : String(uploadErr)));
+          setIsUpdatingPengurus(false);
+          return;
+        }
+      }
+
+      // UPDATE BY ID: Hanya meng-update baris/ID data pengurus yang sama di database, tidak membuat data baru (INSERT)
+      const updatedPengurus = (siteContent.pengurus || []).map((item, idx) => {
+        const itemId = item.id || `pengurus_${idx}`;
+        if (itemId === id) {
+          return {
+            ...item,
+            id: itemId,
+            jabatan: editPengurusForm.jabatan.trim(),
+            nama: editPengurusForm.nama.trim(),
+            photo: finalPhotoUrl
+          };
+        }
+        return item;
       });
-      alert('Data Pengurus Berhasil Disimpan!');
-    } catch (error) {
-      console.error("Gagal sinkron pengurus:", error);
+
+      const newContent = {
+        ...siteContent,
+        pengurus: updatedPengurus,
+        settings: {
+          ...siteContent.settings,
+          pengurusRaw: JSON.stringify(updatedPengurus)
+        }
+      };
+
+      setSiteContent(newContent);
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'updateContent', data: newContent }),
+        });
+      } catch (cloudErr) {
+        console.error("Gagal sinkron pengurus ke cloud:", cloudErr);
+      }
+
+      alert('Perubahan data pengurus berhasil disimpan!');
+      setEditingPengurusId(null);
+      setEditPengurusForm({
+        id: '',
+        jabatan: '',
+        nama: '',
+        currentPhoto: '',
+        newPhotoBase64: null,
+        newPhotoPreview: null
+      });
+    } catch (err) {
+      console.error("Error update pengurus:", err);
+      alert('Terjadi kesalahan saat menyimpan perubahan pengurus: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsUpdatingPengurus(false);
     }
-    setPengurusForm({ jabatan: 'Ketua', nama: '', photo: '' });
+  };
+
+  const handleDeletePengurus = async (id: string) => {
+    const pengurusItem = (siteContent.pengurus || []).find((p, idx) => (p.id || `pengurus_${idx}`) === id);
+    const confirmName = pengurusItem ? `"${pengurusItem.nama}" (${pengurusItem.jabatan})` : 'pengurus ini';
+    if (!window.confirm(`Yakin ingin menghapus data ${confirmName}?`)) return;
+
+    setIsUpdatingPengurus(true);
+    try {
+      const updatedPengurus = (siteContent.pengurus || []).filter((p, idx) => (p.id || `pengurus_${idx}`) !== id);
+      const newContent = {
+        ...siteContent,
+        pengurus: updatedPengurus,
+        settings: {
+          ...siteContent.settings,
+          pengurusRaw: JSON.stringify(updatedPengurus)
+        }
+      };
+      setSiteContent(newContent);
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'updateContent', data: newContent }),
+        });
+      } catch (cloudErr) {
+        console.error("Gagal sinkron hapus pengurus:", cloudErr);
+      }
+
+      alert('Data pengurus berhasil dihapus!');
+      setEditingPengurusId(null);
+    } catch (err) {
+      console.error("Error hapus pengurus:", err);
+      alert('Gagal menghapus pengurus.');
+    } finally {
+      setIsUpdatingPengurus(false);
+    }
+  };
+
+  const handleSavePengurus = async () => {
+    if (!pengurusForm.nama.trim()) { alert('Nama pengurus harus diisi.'); return; }
+    if (!pengurusForm.jabatan.trim()) { alert('Jabatan pengurus harus diisi.'); return; }
+
+    setIsSavingNewPengurus(true);
+    try {
+      let photoUrl = pengurusForm.photo || '';
+
+      // Jika foto adalah base64 data, upload ke Google Drive terlebih dahulu
+      if (photoUrl && photoUrl.startsWith('data:image')) {
+        try {
+          const uploadedUrl = await uploadBase64ToDrive(photoUrl, 'pengurus');
+          if (uploadedUrl) {
+            photoUrl = uploadedUrl;
+          }
+        } catch (uploadErr) {
+          console.error("Gagal unggah foto pengurus baru ke Drive:", uploadErr);
+          alert("Gagal mengunggah foto pengurus ke Google Drive: " + (uploadErr instanceof Error ? uploadErr.message : String(uploadErr)));
+          setIsSavingNewPengurus(false);
+          return;
+        }
+      }
+
+      const newPengurus: PengurusRecord = { 
+        ...pengurusForm, 
+        nama: pengurusForm.nama.trim(),
+        jabatan: pengurusForm.jabatan.trim(),
+        photo: photoUrl, 
+        id: Date.now().toString() 
+      };
+
+      // Tambah pengurus baru tanpa menimpa/menghapus pengurus lain yang sudah ada
+      const updatedPengurus = [...(siteContent.pengurus || []), newPengurus];
+      const newContent = {
+        ...siteContent,
+        pengurus: updatedPengurus,
+        settings: { ...siteContent.settings, pengurusRaw: JSON.stringify(updatedPengurus) }
+      };
+
+      setSiteContent(newContent);
+      localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST', mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'updateContent', data: newContent }),
+        });
+        alert('Data Pengurus Baru Berhasil Ditambahkan!');
+      } catch (error) {
+        console.error("Gagal sinkron pengurus baru:", error);
+      }
+
+      setPengurusForm({ jabatan: 'Ketua', nama: '', photo: '' });
+    } catch (err) {
+      console.error("Error simpan pengurus baru:", err);
+      alert('Terjadi kesalahan saat menambah pengurus baru.');
+    } finally {
+      setIsSavingNewPengurus(false);
+    }
   }
 
   // ── Fungsi helper: ekstrak folder ID dari link Google Drive ──
@@ -2121,49 +2309,262 @@ function App() {
   }
 
   const renderPengurus = () => {
-    const pengurusList = siteContent.pengurus || []
+    const rawList = siteContent.pengurus || []
+    const pengurusList: PengurusRecord[] = rawList.map((p, idx) => ({
+      ...p,
+      id: p.id || `pengurus_${idx}_${p.jabatan || 'item'}`
+    }))
+
     if (!isLoggedIn) {
       return (
         <div className="page-content">
           <h2>Daftar Pengurus</h2>
-          <div className="pengurus-grid">
-            {pengurusList.map(p => (
-              <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" width={400} height={400} />}
-                <h3>{p.jabatan}</h3><p>{p.nama}</p>
-              </div>
-            ))}
-          </div>
+          {pengurusList.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#666', marginTop: '20px' }}>Belum ada data pengurus yang ditampilkan.</p>
+          ) : (
+            <div className="pengurus-grid">
+              {pengurusList.map(p => (
+                <div key={p.id} className="pengurus-card">
+                  {p.photo ? (
+                    <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" width={400} height={400} />
+                  ) : (
+                    <div style={{ width: '120px', height: '120px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px auto', fontSize: '2.5rem' }}>
+                      👤
+                    </div>
+                  )}
+                  <h3>{p.jabatan}</h3>
+                  <p>{p.nama}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )
     } else {
       return (
         <div className="page-content">
           <h2>Daftar Pengurus</h2>
-          <div className="pengurus-grid">
-            {pengurusList.map(p => (
-              <div key={p.id} className="pengurus-card">
-                {p.photo && <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" width={400} height={400} />}
-                <h3>{p.jabatan}</h3><p>{p.nama}</p>
-              </div>
-            ))}
-          </div>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '20px' }}>
+            Klik tombol <strong>Edit</strong> di pojok kartu pengurus untuk mengubah data atau memperbarui foto.
+          </p>
 
-          <h2 style={{ marginTop: '40px' }}>Kelola Pengurus</h2>
+          {pengurusList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', marginBottom: '30px' }}>
+              <p style={{ color: '#64748b', margin: 0 }}>Belum ada data pengurus. Silakan tambahkan pengurus melalui form "Tambah Pengurus Baru" di bawah.</p>
+            </div>
+          ) : (
+            <div className="pengurus-grid">
+              {pengurusList.map(p => {
+                const isEditingThisCard = editingPengurusId === p.id;
+
+                if (isEditingThisCard) {
+                  return (
+                    <div key={p.id} className="pengurus-card is-editing">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 'bold', color: '#1976d2' }}>✏️ Edit Pengurus</span>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditPengurus}
+                          style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b', lineHeight: 1 }}
+                          title="Batal Edit"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Foto Preview & Status */}
+                      <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+                        {editPengurusForm.newPhotoPreview ? (
+                          <img
+                            src={editPengurusForm.newPhotoPreview}
+                            alt="Preview Foto Baru"
+                            className="pengurus-photo"
+                            style={{ width: '90px', height: '90px', margin: '0 auto 6px auto', display: 'block', objectFit: 'cover' }}
+                          />
+                        ) : editPengurusForm.currentPhoto ? (
+                          <img
+                            src={toImageKitUrl(editPengurusForm.currentPhoto, 200, true)}
+                            alt={editPengurusForm.nama}
+                            className="pengurus-photo"
+                            style={{ width: '90px', height: '90px', margin: '0 auto 6px auto', display: 'block', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div style={{ width: '90px', height: '90px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px auto', fontSize: '2rem' }}>
+                            👤
+                          </div>
+                        )}
+                        <span style={{ fontSize: '0.72rem', color: editPengurusForm.newPhotoBase64 ? '#16a34a' : '#64748b', fontWeight: 600, display: 'block' }}>
+                          {editPengurusForm.newPhotoBase64 ? '✓ Foto baru dipilih' : (editPengurusForm.currentPhoto ? 'Foto saat ini (tersimpan)' : 'Belum ada foto')}
+                        </span>
+                        {editPengurusForm.newPhotoBase64 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditPengurusForm(prev => ({ ...prev, newPhotoBase64: null, newPhotoPreview: null }))}
+                            style={{ display: 'block', margin: '3px auto 0 auto', background: 'none', border: 'none', color: '#dc2626', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            Batal ganti foto (gunakan foto lama)
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Kolom 1: Upload Foto Baru */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                          Upload Foto Baru
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleEditPengurusPhoto}
+                          style={{ fontSize: '0.75rem', width: '100%', boxSizing: 'border-box' }}
+                        />
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>
+                          Biarkan kosong jika ingin tetap menggunakan foto lama.
+                        </span>
+                      </div>
+
+                      {/* Kolom 2: Input Nama Jabatan */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                          Jabatan
+                        </label>
+                        <input
+                          type="text"
+                          value={editPengurusForm.jabatan}
+                          onChange={e => setEditPengurusForm({ ...editPengurusForm, jabatan: e.target.value })}
+                          placeholder="Nama jabatan (cth: Ketua)"
+                          list="jabatan-edit-datalist"
+                          style={{ width: '100%', padding: '6px 8px', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                        />
+                        <datalist id="jabatan-edit-datalist">
+                          <option value="Ketua" />
+                          <option value="Wakil Ketua" />
+                          <option value="Sekretaris" />
+                          <option value="Wakil Sekretaris" />
+                          <option value="Bendahara" />
+                          <option value="Wakil Bendahara" />
+                          <option value="Koordinator" />
+                          <option value="Anggota" />
+                        </datalist>
+                      </div>
+
+                      {/* Kolom 3: Input Nama Orang */}
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                          Nama Orang
+                        </label>
+                        <input
+                          type="text"
+                          value={editPengurusForm.nama}
+                          onChange={e => setEditPengurusForm({ ...editPengurusForm, nama: e.target.value })}
+                          placeholder="Nama lengkap"
+                          style={{ width: '100%', padding: '6px 8px', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                        />
+                      </div>
+
+                      {/* Tombol Simpan & Batal */}
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          className="btn-save"
+                          style={{ flex: 1, padding: '7px 8px', fontSize: '0.8rem', textTransform: 'none', margin: 0, backgroundColor: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                          onClick={() => handleUpdatePengurus(p.id)}
+                          disabled={isUpdatingPengurus}
+                        >
+                          {isUpdatingPengurus ? 'Menyimpan...' : 'Simpan Perubahan'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-delete"
+                          style={{ padding: '7px 10px', fontSize: '0.8rem', textTransform: 'none', margin: 0, backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                          onClick={handleCancelEditPengurus}
+                          disabled={isUpdatingPengurus}
+                        >
+                          Batal
+                        </button>
+                      </div>
+
+                      {/* Tombol Hapus */}
+                      <div style={{ marginTop: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '6px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePengurus(p.id)}
+                          disabled={isUpdatingPengurus}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', cursor: 'pointer', padding: '2px 4px' }}
+                        >
+                          🗑️ Hapus pengurus ini
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={p.id} className="pengurus-card" style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      className="btn-card-edit"
+                      onClick={() => handleStartEditPengurus(p)}
+                      title="Edit data pengurus ini"
+                    >
+                      ✏️ Edit
+                    </button>
+                    {p.photo ? (
+                      <img src={toImageKitUrl(p.photo, 400, true)} alt={p.nama} className="pengurus-photo" loading="lazy" width={400} height={400} />
+                    ) : (
+                      <div style={{ width: '120px', height: '120px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px auto', fontSize: '2.5rem' }}>
+                        👤
+                      </div>
+                    )}
+                    <h3>{p.jabatan}</h3>
+                    <p>{p.nama}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <h2 style={{ marginTop: '45px' }}>Tambah Pengurus Baru</h2>
           <div className="form-section">
+            <p style={{ color: '#64748b', fontSize: '0.88rem', marginTop: '-5px', marginBottom: '16px' }}>
+              Gunakan form di bawah ini khusus untuk menambahkan pengurus baru ke dalam daftar. Untuk mengubah data pengurus yang sudah ada, gunakan tombol <strong>Edit</strong> pada kartu pengurus di atas.
+            </p>
             <label>Jabatan</label>
-            <select value={pengurusForm.jabatan} onChange={e => setPengurusForm({ ...pengurusForm, jabatan: e.target.value })}>
-              <option value="Ketua">Ketua</option><option value="Wakil Ketua">Wakil Ketua</option><option value="Sekretaris">Sekretaris</option><option value="Wakil Sekretaris">Wakil Sekretaris</option><option value="Bendahara">Bendahara</option><option value="Wakil Bendahara">Wakil Bendahara</option>
-            </select>
-            <label>Nama</label><input type="text" value={pengurusForm.nama} onChange={e => setPengurusForm({ ...pengurusForm, nama: e.target.value })} />
-            <label>Foto</label><input type="file" accept="image/*" onChange={handlePengurusPhoto} />
+            <input
+              type="text"
+              value={pengurusForm.jabatan}
+              onChange={e => setPengurusForm({ ...pengurusForm, jabatan: e.target.value })}
+              placeholder="Pilih atau ketik jabatan..."
+              list="jabatan-tambah-options"
+            />
+            <datalist id="jabatan-tambah-options">
+              <option value="Ketua" />
+              <option value="Wakil Ketua" />
+              <option value="Sekretaris" />
+              <option value="Wakil Sekretaris" />
+              <option value="Bendahara" />
+              <option value="Wakil Bendahara" />
+              <option value="Koordinator" />
+              <option value="Anggota" />
+            </datalist>
+            <label>Nama</label>
+            <input
+              type="text"
+              value={pengurusForm.nama}
+              onChange={e => setPengurusForm({ ...pengurusForm, nama: e.target.value })}
+              placeholder="Nama lengkap pengurus baru"
+            />
+            <label>Foto</label>
+            <input type="file" accept="image/*" onChange={handlePengurusPhoto} />
             {pengurusForm.photo && (
               <div className="preview-container">
                 <img src={toImageKitUrl(pengurusForm.photo, 200, true)} alt="Preview Foto" className="file-preview-img" width={200} height={200} />
                 <button type="button" className="btn-remove-file" onClick={() => setPengurusForm({ ...pengurusForm, photo: '' })}>Hapus Foto</button>
               </div>
             )}
-            <button className="btn-save" onClick={handleSavePengurus}>Simpan Pengurus</button>
+            <button className="btn-save" onClick={handleSavePengurus} disabled={isSavingNewPengurus}>
+              {isSavingNewPengurus ? 'Menyimpan...' : 'Tambah Pengurus Baru'}
+            </button>
           </div>
         </div>
       )

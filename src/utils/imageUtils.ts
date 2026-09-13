@@ -56,7 +56,7 @@ export const toImageKitUrl = (url: string | undefined | null, width = 800, cropF
   if (!url) return '';
   const endpoint = (import.meta.env.VITE_IMAGEKIT_ENDPOINT as string | undefined) || 'https://ik.imagekit.io/imkksa';
   
-  const tr = cropFace ? `tr=w-${width},h-${width},fo-face` : `tr=w-${width},q-80`;
+  const tr = cropFace ? `tr=w-${width},h-${width},fo-face,f-auto` : `tr=w-${width},q-80,f-auto`;
 
   if (url.includes('ik.imagekit.io')) {
     const cleanUrl = url.split('?')[0];
