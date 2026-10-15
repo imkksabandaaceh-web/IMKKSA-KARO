@@ -8,7 +8,6 @@ export interface UmatRecord {
   id: string
   nama: string
   status: string
-  nik: string
   alamat: string
   noHp: string
   photo: string
@@ -20,13 +19,13 @@ export interface UmatRecord {
 
 // Bentuk baris di tabel public.umat.
 // Kolom selain id/nama/is_pending dibuat opsional karena query publik
-// (fetchApproved) tidak memilih kolom sensitif NIK & KK.
+// (fetchApproved) tidak memilih kolom sensitif KK.
+// Catatan: kolom `nik` pada DB tetap ada tapi tidak lagi dipakai UI.
 interface UmatRow {
   id: string
   nama: string
   is_pending: boolean
   status?: string | null
-  nik?: string | null
   alamat?: string | null
   no_hp?: string | null
   photo?: string | null
@@ -40,7 +39,6 @@ const toApp = (row: UmatRow): UmatRecord => ({
   id: row.id,
   nama: row.nama,
   status: row.status || 'Anggota',
-  nik: row.nik || '',
   alamat: row.alamat || '',
   noHp: row.no_hp || '',
   photo: row.photo || '',
@@ -55,7 +53,6 @@ const toDb = (u: UmatRecord) => ({
   id: u.id,
   nama: u.nama,
   status: u.status,
-  nik: u.nik,
   alamat: u.alamat,
   no_hp: u.noHp,
   photo: u.photo,
@@ -65,15 +62,15 @@ const toDb = (u: UmatRecord) => ({
   tanggal_lahir: u.tanggalLahir || '',
 })
 
-// Kolom yang aman untuk publik (TANPA NIK & KK yang bersifat privat)
+// Kolom yang aman untuk publik (TANPA KK yang bersifat privat)
 const PUBLIC_COLS = 'id,nama,status,alamat,no_hp,photo,tempat_lahir,tanggal_lahir,is_pending,created_at'
 // Kolom lengkap (khusus admin yang sudah login)
-const ALL_COLS = 'id,nama,status,nik,alamat,no_hp,photo,kk,tempat_lahir,tanggal_lahir,is_pending,created_at'
+const ALL_COLS = 'id,nama,status,alamat,no_hp,photo,kk,tempat_lahir,tanggal_lahir,is_pending,created_at'
 
 export const umatService = {
   /**
    * Publik: hanya anggota yang sudah disetujui (is_pending = false),
-   * tanpa kolom sensitif (NIK, KK). Mendukung pencarian nama via ilike.
+   * tanpa kolom sensitif (KK). Mendukung pencarian nama via ilike.
    */
   async fetchApproved(search = ''): Promise<UmatRecord[]> {
     let query = supabase
@@ -93,7 +90,7 @@ export const umatService = {
   },
 
   /**
-   * Admin (perlu sesi login Supabase): semua baris, termasuk pending, NIK, KK.
+   * Admin (perlu sesi login Supabase): semua baris, termasuk pending, KK.
    * RLS hanya mengizinkan role authenticated membaca/menulis penuh.
    */
   async fetchAll(): Promise<UmatRecord[]> {
