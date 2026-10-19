@@ -82,6 +82,45 @@ function doGet(e) {
     }
   }
   // ── AKHIR BLOK TAMBAHAN ──
+
+  // ── Daftar file (semua jenis) untuk menu Berkas ──
+  if (params.action === 'listDocuments') {
+    var docFolderId = params.folderId;
+    if (!docFolderId) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ error: 'folderId diperlukan', files: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      var docCacheKey = 'berkas_folder_' + docFolderId;
+      var docCache = CacheService.getScriptCache();
+      var docFiles = null;
+      if (params.refresh === '1') {
+        docFiles = listDocumentFiles(docFolderId);
+        docCache.put(docCacheKey, JSON.stringify(docFiles), 7200);
+      } else {
+        var docCachedJson = docCache.get(docCacheKey);
+        if (docCachedJson) {
+          try {
+            docFiles = JSON.parse(docCachedJson);
+          } catch (e) {
+            docFiles = null; // cache rusak → hitung ulang di bawah
+          }
+        }
+        if (!docFiles) {
+          docFiles = listDocumentFiles(docFolderId);
+          docCache.put(docCacheKey, JSON.stringify(docFiles), 7200);
+        }
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ files: docFiles }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ error: err.message, files: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
   
   
   // LOGIKA UTAMA: Mengambil foto native dari Folder Google Drive
@@ -412,6 +451,32 @@ function testGoogleDrive() {
 
 function saveGaleriAlbumData(albumList) {
   setLargeProperty("galeriAlbum", JSON.stringify(albumList));
+}
+
+// Daftar SEMUA file (dokumen, gambar, arsip, dll.) untuk menu Berkas.
+// Berbeda dari listFolderFiles milik Galeri yang hanya mengambil gambar.
+function listDocumentFiles(folderId) {
+  try {
+    var folder = DriveApp.getFolderById(folderId);
+    var files = folder.getFiles();
+    var result = [];
+    while (files.hasNext()) {
+      var file = files.next();
+      result.push({
+        id: file.getId(),
+        name: file.getName(),
+        mimeType: file.getMimeType(),
+        size: file.getSize(),
+        updated: file.getLastUpdated().toISOString()
+      });
+    }
+    result.sort(function (a, b) {
+      return a.name.localeCompare(b.name);
+    });
+    return result;
+  } catch (e) {
+    throw new Error('Folder/file tidak dapat dibaca: ' + e.message);
+  }
 }
 
 function listFolderFiles(folderId) {

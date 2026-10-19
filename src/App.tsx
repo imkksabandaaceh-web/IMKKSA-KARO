@@ -6,9 +6,11 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const APanel = lazy(() => import('./components/APanel'))
 const ProposalView = lazy(() => import('./components/ProposalView'))
 const AlbumGallery = lazy(() => import('./components/GaleriView'))
+const BerkasView = lazy(() => import('./components/BerkasView'))
 import './App.css'
 import { umatService } from './services/umat'
 import { compressImage, toImageKitUrl } from './utils/imageUtils'
+import type { FileFolder } from './components/BerkasView'
 
 // Jumlah salinan teks di banner pengumuman supaya animasi marquee tetap
 // penuh (tidak ada ruang kosong) di layar lebar sekalipun.
@@ -142,7 +144,7 @@ const processHtmlContent = (htmlContent: string): string => {
 
 
 // Types
-type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Pengurus' | 'Data Anggota' | 'Proposal' | 'Login' | 'APanel';
+type Tab = 'Beranda' | 'Jadwal Keluarga' | 'Galeri' | 'Berkas' | 'Pengurus' | 'Data Anggota' | 'Proposal' | 'Login' | 'APanel';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -191,6 +193,7 @@ interface SiteSettings {
   announcementText?: string;  // banner pengumuman di atas konten
   announcementBgColor?: string; // warna latar banner pengumuman (default gelap)
   announcementSpeed?: string;   // kecepatan teks banner: detik per putaran (mis. '20')
+  fileFolders?: FileFolder[];   // folder menu Berkas (dikelola dari A.Panel)
   metaDescription?: string;   // deskripsi SEO (meta description)
   hiddenTabs?: string[];      // menu yang disembunyikan (Beranda, Galeri, dll.)
 }
@@ -295,6 +298,7 @@ const DEFAULT_CONTENT: FullContent = {
     buttonTextColor: '#ffffff',
     footerText: '',
     announcementText: '',
+    fileFolders: [],
     metaDescription: '',
     hiddenTabs: [],
   },
@@ -492,6 +496,7 @@ function App() {
     { key: 'Beranda' as Tab, label: 'Beranda' },
     { key: 'Jadwal Keluarga' as Tab, label: 'Jadwal Keluarga' },
     { key: 'Galeri' as Tab, label: 'Galeri' },
+    { key: 'Berkas' as Tab, label: 'Berkas' },
     { key: 'Data Anggota' as Tab, label: 'Data Anggota' },
     { key: 'Pengurus' as Tab, label: 'Pengurus' },
     { key: 'Proposal' as Tab, label: 'Proposal' },
@@ -2590,6 +2595,9 @@ function App() {
     }
     if (activeTab === 'Data Anggota') return renderDataAnggota()
     if (activeTab === 'Galeri') return renderGaleri()
+    if (activeTab === 'Berkas') {
+      return <BerkasView folders={siteContent.settings.fileFolders || []} scriptUrl={SCRIPT_URL} />
+    }
     if (activeTab === 'Pengurus') return renderPengurus()
     if (activeTab === 'Proposal') return <ProposalView isLoggedIn={isLoggedIn} />
     if (activeTab === 'APanel') {

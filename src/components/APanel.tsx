@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { compressImage, toImageKitUrl } from '../utils/imageUtils';
+import type { FileFolder } from './BerkasView';
 
 // --- Tipe ini harus selalu sama persis dengan interface SiteSettings di App.tsx ---
 interface SiteSettings {
@@ -36,6 +37,7 @@ interface SiteSettings {
   announcementText?: string;
   announcementBgColor?: string;
   announcementSpeed?: string;
+  fileFolders?: FileFolder[];
   metaDescription?: string;
   hiddenTabs?: string[];
 }
@@ -169,7 +171,7 @@ const ColorField = ({ label, value, onChange }: {
 );
 
 export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogout, scriptUrl }) => {
-  const [activeTab, setActiveTab] = useState<'header' | 'navigasi' | 'bentuk' | 'isi' | 'seo'>('header');
+  const [activeTab, setActiveTab] = useState<'header' | 'navigasi' | 'bentuk' | 'isi' | 'seo' | 'berkas'>('header');
 
   // --- State pengaturan (diisi dari settings yang sedang aktif) ---
   const [siteTitle, setSiteTitle] = useState(settings.title || 'IMKKSA Banda Aceh Sekitar');
@@ -208,6 +210,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
   const [announcementText, setAnnouncementText] = useState(settings.announcementText || '');
   const [announcementBgColor, setAnnouncementBgColor] = useState(settings.announcementBgColor || '#0d1a13');
   const [announcementSpeed, setAnnouncementSpeed] = useState(settings.announcementSpeed || '20');
+  const [fileFolders, setFileFolders] = useState<FileFolder[]>(settings.fileFolders || []);
   const [metaDescription, setMetaDescription] = useState(settings.metaDescription || '');
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(settings.hiddenTabs || []);
 
@@ -361,6 +364,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
       announcementText,
       announcementBgColor,
       announcementSpeed,
+      fileFolders,
       metaDescription,
       hiddenTabs,
     };
@@ -373,6 +377,39 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // --- Menu Berkas: kelola daftar folder (tambah/ubah/urutkan/hapus) ---
+  const addFileFolder = () => {
+    setFileFolders(prev => [
+      ...prev,
+      {
+        id: `berkas-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        nama: '',
+        deskripsi: '',
+        driveFolderUrl: '',
+        locked: false,
+      },
+    ]);
+    setMessage(null);
+  };
+
+  const updateFileFolder = (id: string, patch: Partial<FileFolder>) => {
+    setFileFolders(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)));
+  };
+
+  const removeFileFolder = (id: string) => {
+    setFileFolders(prev => prev.filter(f => f.id !== id));
+  };
+
+  const moveFileFolder = (index: number, direction: 'up' | 'down') => {
+    setFileFolders(prev => {
+      const arr = [...prev];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      if (target < 0 || target >= arr.length) return arr;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return arr;
+    });
   };
 
   return (
@@ -411,11 +448,12 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
           { key: 'bentuk', label: '📐 Bentuk & Ruang' },
           { key: 'isi', label: '✍️ Isi & Konten' },
           { key: 'seo', label: '📝 Konten & SEO' },
+          { key: 'berkas', label: '📁 Berkas' },
         ].map(tab => (
           <button
             key={tab.key}
             type="button"
-            onClick={() => setActiveTab(tab.key as 'header' | 'navigasi' | 'bentuk' | 'isi' | 'seo')}
+            onClick={() => setActiveTab(tab.key as 'header' | 'navigasi' | 'bentuk' | 'isi' | 'seo' | 'berkas')}
             style={{
               padding: '10px 20px',
               border: 'none',
@@ -851,6 +889,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
               { key: 'Beranda', label: 'Beranda' },
               { key: 'Jadwal Keluarga', label: 'Jadwal Keluarga' },
               { key: 'Galeri', label: 'Galeri' },
+              { key: 'Berkas', label: 'Berkas' },
               { key: 'Data Anggota', label: 'Data Anggota' },
               { key: 'Pengurus', label: 'Pengurus' },
               { key: 'Proposal', label: 'Proposal' },
@@ -868,6 +907,108 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
               Tab yang disembunyikan tidak tampil di menu, dan pengunjung tidak bisa membukanya.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* TAB 6: BERKAS */}
+      {activeTab === 'berkas' && (
+        <div style={{ backgroundColor: '#f8fafc', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+          <div style={{ marginBottom: '20px', fontSize: '0.88rem', color: '#475569', lineHeight: 1.7, background: '#f0f7f0', padding: '12px 16px', borderRadius: '8px', borderLeft: '4px solid #2e7d32' }}>
+            <strong>Cara pakai menu Berkas:</strong><br />
+            1. Upload dokumen ke satu <strong>folder Google Drive</strong>.<br />
+            2. Set folder: <em>“Siapa saja yang punya link”</em> → Viewer.<br />
+            3. Tempel link folder di bawah, beri nama, lalu klik <strong>Simpan Semua Perubahan</strong>.<br />
+            Centang 🔒 untuk mengunci folder: folder tetap tampil di halaman publik, tetapi isinya tidak bisa dibuka.
+          </div>
+
+          {fileFolders.length === 0 && (
+            <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.9rem' }}>
+              Belum ada folder. Klik “Tambah Folder” untuk membuat folder pertama (mis. MOMO atau AD/ART).
+            </p>
+          )}
+
+          {fileFolders.map((folder, index) => (
+            <div
+              key={folder.id}
+              style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                <strong style={{ color: '#334155' }}>📁 Folder {index + 1}</strong>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => moveFileFolder(index, 'up')}
+                    disabled={index === 0}
+                    style={{ padding: '4px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#fff', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.4 : 1 }}
+                    aria-label="Naikkan folder"
+                  >↑</button>
+                  <button
+                    type="button"
+                    onClick={() => moveFileFolder(index, 'down')}
+                    disabled={index === fileFolders.length - 1}
+                    style={{ padding: '4px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#fff', cursor: index === fileFolders.length - 1 ? 'not-allowed' : 'pointer', opacity: index === fileFolders.length - 1 ? 0.4 : 1 }}
+                    aria-label="Turunkan folder"
+                  >↓</button>
+                  <button
+                    type="button"
+                    onClick={() => removeFileFolder(folder.id)}
+                    style={{ padding: '4px 10px', border: 'none', borderRadius: '6px', background: '#ef4444', color: '#fff', cursor: 'pointer' }}
+                  >🗑 Hapus</button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '0.9rem' }}>Nama Folder <span style={{ color: 'red' }}>*</span></label>
+                  <input
+                    type="text"
+                    value={folder.nama}
+                    onChange={e => updateFileFolder(folder.id, { nama: e.target.value })}
+                    placeholder="Contoh: MOMO"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '0.9rem' }}>Deskripsi Singkat (opsional)</label>
+                  <input
+                    type="text"
+                    value={folder.deskripsi || ''}
+                    onChange={e => updateFileFolder(folder.id, { deskripsi: e.target.value })}
+                    placeholder="Contoh: Dokumen MOMO IMKKSA"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.92rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '0.9rem' }}>Link Folder Google Drive <span style={{ color: 'red' }}>*</span></label>
+                <input
+                  type="url"
+                  value={folder.driveFolderUrl}
+                  onChange={e => updateFileFolder(folder.id, { driveFolderUrl: e.target.value })}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer', color: folder.locked ? '#b45309' : '#475569' }}>
+                <input
+                  type="checkbox"
+                  checked={!!folder.locked}
+                  onChange={e => updateFileFolder(folder.id, { locked: e.target.checked })}
+                />
+                🔒 Kunci folder ini (pengunjung melihat “Terkunci” dan tidak bisa membuka isinya)
+              </label>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addFileFolder}
+            style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #2e7d32', background: '#fff', color: '#2e7d32', fontWeight: 700, cursor: 'pointer' }}
+          >
+            ➕ Tambah Folder
+          </button>
         </div>
       )}
 
