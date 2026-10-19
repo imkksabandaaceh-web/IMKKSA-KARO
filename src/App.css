@@ -1635,12 +1635,18 @@ button {
   color: var(--text-color, #2c3e50);
   opacity: 0.85;
 }
+/* Warna status sengaja dibuat tetap (bukan ikut warna tema) supaya tulisan
+   "Buka folder" dan "Terkunci" selalu kontras di atas latar kartu terang. */
 .berkas-card-status {
+  align-self: flex-start;
   margin-top: auto;
-  padding-top: 8px;
+  padding: 4px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--primary-color, #2e7d32);
+  font-weight: 700;
+  color: #b45309;
 }
 .berkas-card-status.locked {
   color: #b45309;
