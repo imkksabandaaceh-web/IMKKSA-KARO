@@ -56,8 +56,13 @@ const fetchFolderDocuments = async (
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const text = (await response.text()).replace(/^\uFEFF/, '').trim();
-  const data: ListDocumentsResult & { error?: string } = JSON.parse(text);
+  const data: ListDocumentsResult & { error?: string; settings?: unknown } = JSON.parse(text);
   if (!Array.isArray(data.files)) {
+    // Deployment Apps Script lama akan membalas data situs (punya `settings`),
+    // bukan daftar file — tandai pesan khusus agar admin tahu harus redeploy.
+    if (data.settings) {
+      throw new Error('Apps Script masih versi lama: action listDocuments belum aktif. Redeploy Apps Script versi baru.');
+    }
     throw new Error(data.error || 'Format respons tidak dikenali');
   }
 
@@ -203,14 +208,24 @@ const BerkasView: React.FC<BerkasViewProps> = ({ folders, scriptUrl }) => {
       <div className="page-content berkas-page">
         <div className="berkas-detail-header">
           <button type="button" className="berkas-back" onClick={backToFolders}>← Kembali ke Berkas</button>
-          <button
-            type="button"
-            className="berkas-refresh"
-            onClick={() => loadDocuments(selectedFolder, true)}
-            disabled={isLoading}
-          >
-            {isLoading ? '⏳ Memuat...' : '🔄 Segarkan'}
-          </button>
+          <div className="berkas-detail-actions">
+            <a
+              className="berkas-drive-link"
+              href={selectedFolder.driveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Buka di Google Drive ↗
+            </a>
+            <button
+              type="button"
+              className="berkas-refresh"
+              onClick={() => loadDocuments(selectedFolder, true)}
+              disabled={isLoading}
+            >
+              {isLoading ? '⏳ Memuat...' : '🔄 Segarkan'}
+            </button>
+          </div>
         </div>
 
         <h2 className="berkas-title">{selectedFolder.nama}</h2>
@@ -232,9 +247,19 @@ const BerkasView: React.FC<BerkasViewProps> = ({ folders, scriptUrl }) => {
         {!isLoading && error && (
           <div className="berkas-state berkas-error">
             <p>{error}</p>
-            <button type="button" className="berkas-btn berkas-btn-primary" onClick={() => loadDocuments(selectedFolder, true)}>
-              Coba Lagi
-            </button>
+            <div className="berkas-error-actions">
+              <button type="button" className="berkas-btn berkas-btn-secondary" onClick={() => loadDocuments(selectedFolder, true)}>
+                Coba Lagi
+              </button>
+              <a
+                className="berkas-btn berkas-btn-primary"
+                href={selectedFolder.driveFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Buka di Google Drive ↗
+              </a>
+            </div>
           </div>
         )}
 

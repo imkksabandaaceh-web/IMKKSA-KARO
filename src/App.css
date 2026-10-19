@@ -1664,6 +1664,16 @@ button {
   background: #fef2f2;
   border-color: #fecaca;
 }
+.berkas-error p {
+  margin: 0;
+}
+.berkas-error-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
 .berkas-detail-header {
   display: flex;
   justify-content: space-between;
@@ -1671,8 +1681,14 @@ button {
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+.berkas-detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .berkas-back,
-.berkas-refresh {
+.berkas-refresh,
+.berkas-drive-link {
   padding: 8px 14px;
   border-radius: 8px;
   border: 1px solid var(--border-color, #cbd5e1);
@@ -1681,9 +1697,12 @@ button {
   font-weight: 600;
   font-size: 0.88rem;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 .berkas-back:hover,
-.berkas-refresh:hover {
+.berkas-refresh:hover,
+.berkas-drive-link:hover {
   background: #f0f7f0;
 }
 .berkas-refresh:disabled {
