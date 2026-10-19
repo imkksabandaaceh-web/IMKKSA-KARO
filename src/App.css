@@ -632,14 +632,14 @@ button {
   letter-spacing: 0.3px;
 }
 
-/* Banner pengumuman (dari A.Panel) — latar sengaja dibuat gelap agar teks
-   terang tetap terbaca, berapa pun warna tema yang dipilih admin. */
+/* Banner pengumuman (dari A.Panel) — warna latar & warna teks diatur lewat
+   CSS var dari A.Panel. Warna teks otomatis gelap/terang agar tetap terbaca. */
 .announcement-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #0d1a13, #23402f);
-  color: #f8faf8;
+  background: var(--announcement-bg, #0d1a13);
+  color: var(--announcement-text, #f8faf8);
   padding: 10px 12px;
   font-size: 0.9rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -656,7 +656,7 @@ button {
   display: flex;
   width: max-content;
   will-change: transform;
-  animation: announcementScroll 20s linear infinite;
+  animation: announcementScroll var(--announcement-duration, 20s) linear infinite;
 }
 
 /* Berhenti saat kursor diarahkan supaya pengunjung bisa membaca dengan tenang */
@@ -664,11 +664,11 @@ button {
   animation-play-state: paused;
 }
 
-/* Berjalan dari kiri ke kanan: satu salinan teks bergeser ke kanan, lalu
+/* Berjalan dari kanan ke kiri: satu salinan teks bergeser ke kiri, lalu
    animasi diulang tanpa terlihat melompat (karena semua salinan sama). */
 @keyframes announcementScroll {
-  from { transform: translateX(calc(-100% / var(--announcement-copies, 2))); }
-  to { transform: translateX(0); }
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% / var(--announcement-copies, 2))); }
 }
 
 .announcement-text {
@@ -698,9 +698,9 @@ button {
 }
 
 .announcement-close {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(127, 127, 127, 0.28);
   border: none;
-  color: #fff;
+  color: inherit;
   border-radius: 50%;
   width: 26px;
   height: 26px;
@@ -712,7 +712,7 @@ button {
 }
 
 .announcement-close:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(127, 127, 127, 0.45);
 }
 
 /* ADMIN DASHBOARD SPECIFIC */

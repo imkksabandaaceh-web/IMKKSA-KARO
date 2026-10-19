@@ -34,6 +34,8 @@ interface SiteSettings {
   buttonTextColor?: string;
   footerText?: string;
   announcementText?: string;
+  announcementBgColor?: string;
+  announcementSpeed?: string;
   metaDescription?: string;
   hiddenTabs?: string[];
 }
@@ -204,6 +206,8 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
   const [buttonTextColor, setButtonTextColor] = useState(settings.buttonTextColor || '#ffffff');
   const [footerText, setFooterText] = useState(settings.footerText || '');
   const [announcementText, setAnnouncementText] = useState(settings.announcementText || '');
+  const [announcementBgColor, setAnnouncementBgColor] = useState(settings.announcementBgColor || '#0d1a13');
+  const [announcementSpeed, setAnnouncementSpeed] = useState(settings.announcementSpeed || '20');
   const [metaDescription, setMetaDescription] = useState(settings.metaDescription || '');
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(settings.hiddenTabs || []);
 
@@ -355,6 +359,8 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
       buttonTextColor,
       footerText,
       announcementText,
+      announcementBgColor,
+      announcementSpeed,
       metaDescription,
       hiddenTabs,
     };
@@ -806,8 +812,29 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
               value={announcementText}
               onChange={e => setAnnouncementText(e.target.value)}
               placeholder="Contoh: Ibadah Keluarga Minggu, 20 Agustus 2026 pukul 10.00 WIB"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.95rem' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.95rem', marginBottom: '16px' }}
             />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', alignItems: 'start' }}>
+              <ColorField label="🎨 Warna Latar Banner" value={announcementBgColor} onChange={setAnnouncementBgColor} />
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                  🏃 Kecepatan Teks Banner: <span style={{ color: '#2e7d32' }}>{announcementSpeed} detik / putaran</span>
+                </label>
+                <input
+                  type="range"
+                  min={8}
+                  max={40}
+                  step={2}
+                  value={Number(announcementSpeed) || 20}
+                  onChange={e => setAnnouncementSpeed(e.target.value)}
+                  style={{ width: '100%' }}
+                  aria-label="Kecepatan teks banner pengumuman (detik per putaran)"
+                />
+                <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '6px 0 0' }}>
+                  Geser ke kiri untuk gerakan lebih cepat. Warna teks menyesuaikan otomatis (gelap/terang) agar tetap terbaca.
+                </p>
+              </div>
+            </div>
           </div>
           <div style={{ marginBottom: '24px' }}>
             <label style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>🔎 Deskripsi SEO (meta description — dipakai Google & pratinjau WhatsApp)</label>

@@ -13,6 +13,31 @@ import { compressImage, toImageKitUrl } from './utils/imageUtils'
 // Jumlah salinan teks di banner pengumuman supaya animasi marquee tetap
 // penuh (tidak ada ruang kosong) di layar lebar sekalipun.
 const ANNOUNCEMENT_MARQUEE_COPIES = 8;
+const ANNOUNCEMENT_DEFAULT_BG = '#0d1a13';
+
+// Durasi satu putaran teks banner (detik). Nilai dari A.Panel bisa berupa
+// string bebas, jadi dibatasi ke rentang wajar dan fallback ke 20 detik.
+const getAnnouncementDuration = (value?: string): string => {
+  const seconds = Number(value);
+  return `${Number.isFinite(seconds) && seconds >= 5 && seconds <= 120 ? seconds : 20}s`;
+};
+
+// Warna teks banner dipilih otomatis (gelap/terang) berdasarkan kecerahan
+// latar, supaya pengumuman tetap terbaca walau admin memilih warna terang.
+const getReadableTextColor = (hex: string): string => {
+  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+  let value = ANNOUNCEMENT_DEFAULT_BG.slice(1);
+  if (match) {
+    value = match[1].length === 3
+      ? match[1].split('').map(c => c + c).join('')
+      : match[1];
+  }
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  // Rumus YIQ: nilai > 150 berarti latar terang → pakai teks gelap.
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#111827' : '#f8faf8';
+};
 
 const formatDateDevice = (dateStr: string | undefined | null): string => {
   if (!dateStr) return '-';
@@ -164,6 +189,8 @@ interface SiteSettings {
   buttonTextColor?: string;   // warna teks tombol solid
   footerText?: string;        // teks footer (alamat/kontak, multi-baris)
   announcementText?: string;  // banner pengumuman di atas konten
+  announcementBgColor?: string; // warna latar banner pengumuman (default gelap)
+  announcementSpeed?: string;   // kecepatan teks banner: detik per putaran (mis. '20')
   metaDescription?: string;   // deskripsi SEO (meta description)
   hiddenTabs?: string[];      // menu yang disembunyikan (Beranda, Galeri, dll.)
 }
@@ -2733,6 +2760,11 @@ function App() {
 
   // --- Pengaturan tema dari A.Panel diterapkan di sini ---
   const s = siteContent.settings;
+  // Abaikan nilai warna banner yang tidak valid (mis. ketikan setengah jadi)
+  // supaya banner tidak pernah tampil tanpa latar yang terbaca.
+  const announcementBgColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((s.announcementBgColor || '').trim())
+    ? (s.announcementBgColor as string).trim()
+    : ANNOUNCEMENT_DEFAULT_BG;
   const appContainerStyle: React.CSSProperties = {
     ['--primary-color' as any]: s.primaryColor || '#2e7d32',
     ['--secondary-color' as any]: s.secondaryColor || '#8bc34a',
@@ -2759,6 +2791,11 @@ function App() {
     ['--card-bg' as any]: s.cardBgColor || '',
     ['--border-color' as any]: s.borderColor || '',
     ['--button-text-color' as any]: s.buttonTextColor || '',
+    // Banner pengumuman: warna latar, warna teks otomatis yang kontras, dan
+    // durasi animasi sesuai pengaturan kecepatan dari A.Panel.
+    ['--announcement-bg' as any]: announcementBgColor,
+    ['--announcement-text' as any]: getReadableTextColor(announcementBgColor),
+    ['--announcement-duration' as any]: getAnnouncementDuration(s.announcementSpeed),
   };
 
   const overlayColor = s.headerBgOverlay || 'rgba(0,0,0,0.25)';
