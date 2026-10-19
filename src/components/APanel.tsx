@@ -919,6 +919,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
             2. Set folder: <em>“Siapa saja yang punya link”</em> → Viewer.<br />
             3. Tempel link folder di bawah, beri nama, lalu klik <strong>Simpan Semua Perubahan</strong>.<br />
             Centang 🔒 untuk mengunci folder: folder tetap tampil di halaman publik, tetapi isinya tidak bisa dibuka.<br />
+            Centang ↗️ jika folder ingin langsung membuka Google Drive saat diklik (daftar file di situs dilewati).<br />
             <strong>Catatan:</strong> folder Drive tidak muncul otomatis — daftarkan di sini satu kali, lalu simpan.
           </div>
 
@@ -1020,6 +1021,15 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
                   onChange={e => updateFileFolder(folder.id, { locked: e.target.checked })}
                 />
                 🔒 Kunci folder ini (pengunjung melihat “Terkunci” dan tidak bisa membuka isinya)
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer', color: '#475569', marginTop: '10px' }}>
+                <input
+                  type="checkbox"
+                  checked={!!folder.openDirectly}
+                  onChange={e => updateFileFolder(folder.id, { openDirectly: e.target.checked })}
+                />
+                ↗️ Buka langsung ke Google Drive saat folder diklik (lewati daftar file di situs)
               </label>
             </div>
           ))}

@@ -7,6 +7,7 @@ export interface FileFolder {
   deskripsi?: string;
   driveFolderUrl: string;
   locked?: boolean; // true → folder tetap tampil tapi tidak bisa dibuka pengunjung
+  openDirectly?: boolean; // true → klik kartu langsung membuka folder di Google Drive
 }
 
 interface BerkasViewProps {
@@ -202,6 +203,16 @@ const BerkasView: React.FC<BerkasViewProps> = ({ folders, scriptUrl }) => {
     setQuery('');
   };
 
+  // Klik kartu folder: langsung ke Drive (jika diset admin) atau buka daftar file.
+  const openFolder = (folder: FileFolder) => {
+    if (folder.locked) return;
+    if (folder.openDirectly) {
+      window.open(folder.driveFolderUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setSelectedFolder(folder);
+  };
+
   // ── Tampilan daftar file di dalam folder ────────────────────────────────
   if (selectedFolder) {
     return (
@@ -325,14 +336,14 @@ const BerkasView: React.FC<BerkasViewProps> = ({ folders, scriptUrl }) => {
                 role={locked ? undefined : 'button'}
                 tabIndex={locked ? undefined : 0}
                 aria-disabled={locked || undefined}
-                onClick={locked ? undefined : () => setSelectedFolder(folder)}
+                onClick={locked ? undefined : () => openFolder(folder)}
                 onKeyDown={
                   locked
                     ? undefined
                     : e => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          setSelectedFolder(folder);
+                          openFolder(folder);
                         }
                       }
                 }
@@ -341,7 +352,7 @@ const BerkasView: React.FC<BerkasViewProps> = ({ folders, scriptUrl }) => {
                 <h3 className="berkas-card-title">{folder.nama}</h3>
                 {folder.deskripsi && <p className="berkas-card-desc">{folder.deskripsi}</p>}
                 <span className={`berkas-card-status${locked ? ' locked' : ''}`}>
-                  {locked ? '🔒 Terkunci' : 'Buka folder →'}
+                  {locked ? '🔒 Terkunci' : folder.openDirectly ? 'Buka di Google Drive ↗' : 'Buka folder →'}
                 </span>
               </div>
             );
