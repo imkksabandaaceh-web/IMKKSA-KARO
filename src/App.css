@@ -632,22 +632,69 @@ button {
   letter-spacing: 0.3px;
 }
 
-/* Banner pengumuman (dari A.Panel) */
+/* Banner pengumuman (dari A.Panel) — latar sengaja dibuat gelap agar teks
+   terang tetap terbaca, berapa pun warna tema yang dipilih admin. */
 .announcement-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  color: #fff;
-  padding: 10px 16px;
+  gap: 8px;
+  background: linear-gradient(135deg, #0d1a13, #23402f);
+  color: #f8faf8;
+  padding: 10px 12px;
   font-size: 0.9rem;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.announcement-marquee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.announcement-marquee-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: announcementScroll 20s linear infinite;
+}
+
+/* Berhenti saat kursor diarahkan supaya pengunjung bisa membaca dengan tenang */
+.announcement-bar:hover .announcement-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Berjalan dari kiri ke kanan: satu salinan teks bergeser ke kanan, lalu
+   animasi diulang tanpa terlihat melompat (karena semua salinan sama). */
+@keyframes announcementScroll {
+  from { transform: translateX(calc(-100% / var(--announcement-copies, 2))); }
+  to { transform: translateX(0); }
 }
 
 .announcement-text {
-  flex: 1;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding-right: 80px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-marquee-track {
+    animation: none;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .announcement-text {
+    padding-right: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .announcement-text:nth-child(n + 2) {
+    display: none;
+  }
 }
 
 .announcement-close {

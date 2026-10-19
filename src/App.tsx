@@ -10,6 +10,10 @@ import './App.css'
 import { umatService } from './services/umat'
 import { compressImage, toImageKitUrl } from './utils/imageUtils'
 
+// Jumlah salinan teks di banner pengumuman supaya animasi marquee tetap
+// penuh (tidak ada ruang kosong) di layar lebar sekalipun.
+const ANNOUNCEMENT_MARQUEE_COPIES = 8;
+
 const formatDateDevice = (dateStr: string | undefined | null): string => {
   if (!dateStr) return '-';
   try {
@@ -2830,7 +2834,18 @@ function App() {
       </nav>
       {announcementText && !announcementDismissed && (
         <div className="announcement-bar">
-          <span className="announcement-text">{announcementText}</span>
+          <div className="announcement-marquee">
+            <div
+              className="announcement-marquee-track"
+              style={{ '--announcement-copies': ANNOUNCEMENT_MARQUEE_COPIES } as React.CSSProperties}
+            >
+              {Array.from({ length: ANNOUNCEMENT_MARQUEE_COPIES }, (_, i) => (
+                <span key={i} className="announcement-text" aria-hidden={i > 0}>
+                  {announcementText}
+                </span>
+              ))}
+            </div>
+          </div>
           <button className="announcement-close" onClick={dismissAnnouncement} aria-label="Tutup pengumuman">✕</button>
         </div>
       )}
