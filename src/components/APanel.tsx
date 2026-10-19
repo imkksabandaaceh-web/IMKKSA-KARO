@@ -441,7 +441,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
       )}
 
       {/* TABS */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '2px solid #e2e8f0' }}>
         {[
           { key: 'header', label: '🖼️ Header & Logo' },
           { key: 'navigasi', label: '🧭 Navigasi & Warna' },
@@ -918,7 +918,26 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
             1. Upload dokumen ke satu <strong>folder Google Drive</strong>.<br />
             2. Set folder: <em>“Siapa saja yang punya link”</em> → Viewer.<br />
             3. Tempel link folder di bawah, beri nama, lalu klik <strong>Simpan Semua Perubahan</strong>.<br />
-            Centang 🔒 untuk mengunci folder: folder tetap tampil di halaman publik, tetapi isinya tidak bisa dibuka.
+            Centang 🔒 untuk mengunci folder: folder tetap tampil di halaman publik, tetapi isinya tidak bisa dibuka.<br />
+            <strong>Catatan:</strong> folder Drive tidak muncul otomatis — daftarkan di sini satu kali, lalu simpan.
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <button
+              type="button"
+              onClick={addFileFolder}
+              style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #2e7d32', background: '#fff', color: '#2e7d32', fontWeight: 700, cursor: 'pointer' }}
+            >
+              ➕ Tambah Folder
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={isSaving}
+              style={{ padding: '10px 18px', borderRadius: '8px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1 }}
+            >
+              {isSaving ? '⏳ Menyimpan...' : '💾 Simpan Perubahan'}
+            </button>
           </div>
 
           {fileFolders.length === 0 && (
@@ -959,7 +978,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '0.9rem' }}>Nama Folder <span style={{ color: 'red' }}>*</span></label>
+                  <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '0.9rem' }}>Nama Folder (judul yang tampil) <span style={{ color: 'red' }}>*</span></label>
                   <input
                     type="text"
                     value={folder.nama}
@@ -989,6 +1008,9 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
                   placeholder="https://drive.google.com/drive/folders/..."
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'monospace', fontSize: '0.85rem' }}
                 />
+                <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Tempel link <strong>folder</strong> (bukan link file). Semua file di dalam folder otomatis tampil di halaman Berkas.
+                </p>
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer', color: folder.locked ? '#b45309' : '#475569' }}>
