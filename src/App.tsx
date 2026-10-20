@@ -2596,7 +2596,7 @@ function App() {
     if (activeTab === 'Data Anggota') return renderDataAnggota()
     if (activeTab === 'Galeri') return renderGaleri()
     if (activeTab === 'Berkas') {
-      return <BerkasView folders={siteContent.settings.fileFolders || []} scriptUrl={SCRIPT_URL} />
+      return <BerkasView folders={siteContent.settings.fileFolders || []} />
     }
     if (activeTab === 'Pengurus') return renderPengurus()
     if (activeTab === 'Proposal') return <ProposalView isLoggedIn={isLoggedIn} />

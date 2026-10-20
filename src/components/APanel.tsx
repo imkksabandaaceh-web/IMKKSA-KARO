@@ -919,7 +919,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
             2. Set folder: <em>“Siapa saja yang punya link”</em> → Viewer.<br />
             3. Tempel link folder di bawah, beri nama, lalu klik <strong>Simpan Semua Perubahan</strong>.<br />
             Centang 🔒 untuk mengunci folder: folder tetap tampil di halaman publik, tetapi isinya tidak bisa dibuka.<br />
-            Centang ↗️ jika folder ingin langsung membuka Google Drive saat diklik (daftar file di situs dilewati).<br />
+            Folder yang tidak dikunci akan langsung terbuka di Google Drive saat diklik pengunjung.<br />
             <strong>Catatan:</strong> folder Drive tidak muncul otomatis — daftarkan di sini satu kali, lalu simpan.
           </div>
 
@@ -1010,7 +1010,7 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontFamily: 'monospace', fontSize: '0.85rem' }}
                 />
                 <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
-                  Tempel link <strong>folder</strong> (bukan link file). Semua file di dalam folder otomatis tampil di halaman Berkas.
+                  Tempel link <strong>folder</strong> (bukan link file). Pengunjung akan langsung dibawa ke folder ini di Google Drive.
                 </p>
               </div>
 
@@ -1021,15 +1021,6 @@ export const APanel: React.FC<APanelProps> = ({ settings, onSaveSettings, onLogo
                   onChange={e => updateFileFolder(folder.id, { locked: e.target.checked })}
                 />
                 🔒 Kunci folder ini (pengunjung melihat “Terkunci” dan tidak bisa membuka isinya)
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer', color: '#475569', marginTop: '10px' }}>
-                <input
-                  type="checkbox"
-                  checked={!!folder.openDirectly}
-                  onChange={e => updateFileFolder(folder.id, { openDirectly: e.target.checked })}
-                />
-                ↗️ Buka langsung ke Google Drive saat folder diklik (lewati daftar file di situs)
               </label>
             </div>
           ))}

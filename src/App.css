@@ -1592,6 +1592,8 @@ button {
 }
 .berkas-card {
   display: flex;
+  text-decoration: none;
+  color: inherit;
   flex-direction: column;
   gap: 8px;
   padding: 20px;
@@ -1636,7 +1638,7 @@ button {
   opacity: 0.85;
 }
 /* Warna status sengaja dibuat tetap (bukan ikut warna tema) supaya tulisan
-   "Buka folder" dan "Terkunci" selalu kontras di atas latar kartu terang. */
+   "Buka di Google Drive" dan "Terkunci" selalu kontras di atas latar kartu terang. */
 .berkas-card-status {
   align-self: flex-start;
   margin-top: auto;
@@ -1659,148 +1661,8 @@ button {
   border: 1px dashed var(--border-color, #cbd5e1);
   border-radius: 12px;
 }
-.berkas-error {
-  color: #b91c1c;
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-.berkas-error p {
-  margin: 0;
-}
-.berkas-error-actions {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 14px;
-}
-.berkas-detail-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-.berkas-detail-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.berkas-back,
-.berkas-refresh,
-.berkas-drive-link {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #cbd5e1);
-  background: #fff;
-  color: var(--primary-color, #2e7d32);
-  font-weight: 600;
-  font-size: 0.88rem;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-.berkas-back:hover,
-.berkas-refresh:hover,
-.berkas-drive-link:hover {
-  background: #f0f7f0;
-}
-.berkas-refresh:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-.berkas-search {
-  width: 100%;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 10px;
-  font-size: 0.95rem;
-}
-.berkas-file-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.berkas-file {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 10px;
-}
-.berkas-file-icon {
-  font-size: 1.35rem;
-}
-.berkas-file-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.berkas-file-name {
-  color: var(--link-color, #1a73e8);
-  font-weight: 600;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-.berkas-file-name:hover {
-  text-decoration: underline;
-}
-.berkas-file-meta {
-  font-size: 0.8rem;
-  color: #64748b;
-}
-.berkas-file-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.berkas-btn {
-  display: inline-block;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.berkas-btn-secondary {
-  border: 1px solid var(--primary-color, #2e7d32);
-  color: var(--primary-color, #2e7d32);
-  background: #fff;
-}
-.berkas-btn-secondary:hover {
-  background: #f0f7f0;
-}
-.berkas-btn-primary {
-  background: var(--primary-color, #2e7d32);
-  color: #fff;
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-.berkas-btn-primary:hover {
-  filter: brightness(0.93);
-}
-
 @media (max-width: 600px) {
   .berkas-grid {
     grid-template-columns: 1fr;
-  }
-  .berkas-file {
-    flex-wrap: wrap;
-  }
-  .berkas-file-info {
-    flex-basis: calc(100% - 48px);
-  }
-  .berkas-file-actions {
-    width: 100%;
-    justify-content: flex-end;
   }
 }
