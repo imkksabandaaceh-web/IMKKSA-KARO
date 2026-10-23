@@ -10,8 +10,8 @@
 // Referensi:
 //   https://supabase.com/docs/guides/getting-started/api-keys
 //   https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys
-import type { MemberMatch, NewMember, SessionData, WaSession, WaState, WaStore } from './types.ts'
-import { normalizePhone } from './phone.ts'
+import type { MemberMatch, NewMember, SessionData, WaSession, WaState, WaStore } from './types.js'
+import { normalizePhone } from './phone.js'
 
 const TABEL_SESI = 'wa_sessions'
 const TABEL_UMAT = 'umat'

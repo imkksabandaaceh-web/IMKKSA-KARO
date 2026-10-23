@@ -13,6 +13,7 @@ import { createWhatsappHandler } from '../server/whatsapp/http.ts'
 import { sendViaFonnte } from '../server/whatsapp/fonnte.ts'
 import { normalizePhone } from '../server/whatsapp/phone.ts'
 import { createSupabaseStore } from '../server/whatsapp/store.ts'
+import apiHandler from '../api/whatsapp.ts'
 
 const SECRET = 'secret-palsu-untuk-uji-lokal'
 const TOKEN_PALSU = 'token-fonnte-palsu'
@@ -146,6 +147,32 @@ function pesanMasuk(text, overrides = {}) {
 
 async function main() {
   console.log('\n=== UJI LOKAL WEBHOOK WHATSAPP (tanpa WhatsApp & tanpa Supabase) ===\n')
+
+  // ---------- 0. Handler asli tanpa environment variable ----------
+  // Handler di api/whatsapp.ts harus bisa di-import dan menolak GET dengan 405
+  // walau belum ada WA_WEBHOOK_SECRET / kunci Supabase sama sekali.
+  console.log('0) Handler asli tanpa environment variable')
+  {
+    const secretSemula = process.env.WA_WEBHOOK_SECRET
+    delete process.env.WA_WEBHOOK_SECRET
+
+    let kode = 0
+    const res = {
+      status(code) {
+        kode = code
+        return res
+      },
+      json() {
+        return res
+      },
+    }
+
+    await apiHandler({ method: 'GET', query: {}, headers: {} }, res)
+    cek('GET /api/whatsapp dibalas 405 tanpa env', kode === 405, kode)
+
+    if (secretSemula === undefined) delete process.env.WA_WEBHOOK_SECRET
+    else process.env.WA_WEBHOOK_SECRET = secretSemula
+  }
 
   // ---------- 1. Keamanan webhook ----------
   console.log('1) Keamanan webhook')

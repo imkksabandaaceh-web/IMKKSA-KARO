@@ -1,6 +1,6 @@
 // Semua teks balasan WhatsApp. Dipisah agar mudah diubah tanpa menyentuh logika.
-import type { SessionData } from './types.ts'
-import { tanggalLahirToText } from './validate.ts'
+import type { SessionData } from './types.js'
+import { tanggalLahirToText } from './validate.js'
 
 export const pesan = {
   menu(): string {

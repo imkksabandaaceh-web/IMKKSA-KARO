@@ -1,9 +1,9 @@
 // Lapisan HTTP webhook WhatsApp: verifikasi secret, buang pesan yang tidak perlu,
 // lalu teruskan teks ke state machine dan kirim balasan lewat gateway.
 import { timingSafeEqual } from 'node:crypto'
-import type { WaStore } from './types.ts'
-import { maskPhone, normalizePhone } from './phone.ts'
-import { handleIncoming } from './stateMachine.ts'
+import type { WaStore } from './types.js'
+import { maskPhone, normalizePhone } from './phone.js'
+import { handleIncoming } from './stateMachine.js'
 
 export interface WaHttpRequest {
   method?: string

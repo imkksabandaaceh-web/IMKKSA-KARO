@@ -1,15 +1,15 @@
 // State machine percakapan WhatsApp pendataan anggota.
 // Fungsi ini murni soal alur + validasi; pengiriman balasan dilakukan lapisan HTTP.
-import type { SessionData, WaSession, WaState, WaStore } from './types.ts'
-import { normalizePhone } from './phone.ts'
+import type { SessionData, WaSession, WaState, WaStore } from './types.js'
+import { normalizePhone } from './phone.js'
 import {
   cleanInput,
   parseTanggalLahir,
   validateAlamat,
   validateNama,
   validateTempatLahir,
-} from './validate.ts'
-import { pesan } from './messages.ts'
+} from './validate.js'
+import { pesan } from './messages.js'
 
 /** Sesi yang tidak dilanjutkan dalam 1 jam dianggap kedaluwarsa. */
 export const SESSION_TTL_MS = 60 * 60 * 1000

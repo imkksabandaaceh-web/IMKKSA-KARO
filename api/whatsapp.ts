@@ -3,9 +3,12 @@
 // Alur: request -> verifikasi secret -> filter pesan -> state machine -> balas via Fonnte.
 // Rahasia hanya dibaca dari environment variable, tidak pernah ditulis di kode:
 //   WA_WEBHOOK_SECRET, WA_GATEWAY_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-import { createWhatsappHandler } from '../server/whatsapp/http.ts'
-import { createSupabaseStore } from '../server/whatsapp/store.ts'
-import { sendViaFonnte } from '../server/whatsapp/fonnte.ts'
+//
+// Import memakai akhiran .js (bukan .ts): Vercel mengompilasi setiap file .ts
+// menjadi .js tanpa mengubah tulisan import, sehingga runtime mencari nama .js.
+import { createWhatsappHandler } from '../server/whatsapp/http.js'
+import { createSupabaseStore } from '../server/whatsapp/store.js'
+import { sendViaFonnte } from '../server/whatsapp/fonnte.js'
 
 const handler = createWhatsappHandler({
   getSecret: () => process.env.WA_WEBHOOK_SECRET,

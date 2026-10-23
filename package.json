@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "wa:test": "node scripts/test-whatsapp.mjs"
+    "wa:test": "node --import ./scripts/ts-resolve-hook.mjs scripts/test-whatsapp.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
