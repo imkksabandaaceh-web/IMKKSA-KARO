@@ -46,8 +46,14 @@ mana" setiap nomor). Tabel `umat` **tidak diubah** sama sekali.
 5. Klik tombol **Run** (atau tekan Ctrl+Enter).
 6. Harus muncul tulisan **"Success. No rows returned"**. Itu tanda berhasil.
 
-Isi perintahnya hanya `create table if not exists ...` dan `create index if not
-exists ...`, jadi aman dijalankan dua kali dan tidak menghapus data apa pun.
+Isi perintahnya hanya `create table if not exists ...`, `create index if not
+exists ...`, dan `grant ... to service_role` (izin akses untuk server), jadi aman
+dijalankan dua kali dan tidak menghapus data apa pun.
+
+> **Sudah pernah membuat tabel ini sebelumnya?** Jalankan ulang file SQL yang
+> terbaru. Perintah `grant` perlu ikut terpasang agar webhook bisa membaca/
+> menulis `wa_sessions`; tanpa izin itu, log akan menampilkan
+> `permission denied for table wa_sessions`.
 
 ---
 
@@ -149,14 +155,41 @@ Environment variable baru hanya terbaca oleh deploy **baru**.
 
 ---
 
-## Langkah 6 — Cara mengecek log di Vercel
+## Langkah 6 — Cara mengecek log webhook di Vercel
 
-Kalau ada masalah, log menunjukkan apa yang terjadi (tanpa menampilkan token).
+Log adalah tempat pertama untuk melihat kenapa chat tidak dibalas. Log webhook
+ini **tidak pernah memuat token atau kunci**, dan nomor HP disamarkan (contoh
+`6281***333`).
 
-1. Buka project di Vercel → tab **Deployments** → klik deployment teratas.
-2. Klik **Functions** / **Logs** (atau **Runtime Logs**), lalu kirim chat uji lagi
-   dari HP. Log akan muncul beberapa detik kemudian.
-3. Baris yang perlu dicari: `[wa] pesan diproses` atau `[wa] gagal memproses`.
+### Membuka log di dashboard Vercel
+
+1. Buka project di Vercel, lalu klik **Logs** di menu atas. Kalau tidak ada,
+buka **Observability** → **Logs**.
+2. Pilih environment sesuai alamat webhook yang dipakai di Fonnte:
+   **Production** (domain utama) atau **Preview** (alamat pratinjau cabang).
+3. Saring log: pilih **Function** = `api/whatsapp`, dan atur rentang waktu ke
+   **Last 1 hour**.
+4. Kirim ulang chat uji dari HP, tunggu 5–10 detik, lalu klik **Refresh**
+   (daftar log tidak selalu bertambah sendiri).
+5. Klik satu baris untuk melihat **status HTTP** dan detail baris log `[wa] ...`.
+
+Baris log yang perlu dicari:
+
+- `[wa] pesan diproses` → pesan diterima dan alur berjalan.
+- `[wa] gagal memproses pesan` → ada error; penyebabnya ada di bagian `error`.
+- `[wa] secret webhook salah atau kosong` → secret tidak cocok.
+- `[wa] WA_WEBHOOK_SECRET belum diset` → environment variable belum terbaca.
+
+### Arti status balasan
+
+| Status & isi balasan | Artinya |
+|----------------------|---------|
+| `200` + `"replied": true` | Pesan diproses dan balasan sudah dikirim ke Fonnte. |
+| `200` + `"ignored": "pesan-grup"`, `"nomor-bot-sendiri"`, `"tanpa-teks"`, atau `"tanpa-pengirim"` | Pesan sengaja diabaikan, bukan error. |
+| `200` + `"replied": false` | Pesan diproses, tetapi tidak ada teks balasan yang perlu dikirim. |
+| `401` | `secret` di URL Fonnte tidak sama dengan `WA_WEBHOOK_SECRET`. |
+| `405` | Permintaan bukan POST (biasanya salah metode saat menguji manual). |
+| `500` | Server error: env belum diset, Supabase menolak, atau Fonnte gagal. |
 
 Dari terminal (kalau Vercel CLI terpasang & login):
 
@@ -164,7 +197,7 @@ Dari terminal (kalau Vercel CLI terpasang & login):
 vercel logs <URL-DEPLOYMENT> --follow
 ```
 
-Arti pesan umum:
+Arti pesan error yang umum:
 
 | Yang muncul | Artinya | Solusi |
 |-------------|---------|--------|
@@ -172,6 +205,8 @@ Arti pesan umum:
 | `500 server belum dikonfigurasi` | `WA_WEBHOOK_SECRET` belum terbaca | Isi env di Vercel, lalu redeploy |
 | `[wa] gagal memproses pesan` + `SUPABASE_... belum diset` | Kunci Supabase belum ada | Isi `SUPABASE_URL` & `SUPABASE_SERVICE_ROLE_KEY`, redeploy |
 | `[wa] gagal memproses pesan` + `relation "wa_sessions" does not exist` | Langkah 1 belum dijalankan | Jalankan SQL migrasi |
+| `[wa] gagal memproses pesan` + `permission denied for table` | Izin tabel (GRANT) belum ada | Jalankan ulang SQL migrasi, termasuk bagian `grant ... to service_role` |
+| `[wa] gagal memproses pesan` + `Supabase menolak permintaan (HTTP 401)` | Kunci Supabase salah atau sudah dinonaktifkan | Periksa `SUPABASE_SERVICE_ROLE_KEY`, lalu redeploy |
 | `[wa] gagal memproses pesan` + `Fonnte menolak pesan` | Token salah / kuota habis / device terputus | Cek dashboard Fonnte |
 | Tidak ada log sama sekali | Webhook tidak sampai (URL salah, Auto Read mati, atau proteksi Vercel) | Lihat bagian di bawah |
 
@@ -237,7 +272,9 @@ curl -X POST "http://localhost:3000/api/whatsapp?secret=secret-palsu-uji" \
 - Webhook wajib menyertakan `?secret=...` (atau header `x-webhook-secret`).
   Tanpa secret yang benar, server menjawab 401 dan tidak memproses apa pun.
 - Pesan grup, pesan dari nomor bot sendiri, dan pesan tanpa teks diabaikan.
-- Tabel `wa_sessions` memakai RLS tanpa policy: hanya server (service role)
-  yang bisa membaca/menulis, browser tidak bisa.
+- Tabel `wa_sessions` memakai RLS tanpa policy dan hanya diberi izin tabel
+  kepada `service_role`: hanya server yang bisa membaca/menulis, browser tidak
+  bisa. Izin ini ditulis eksplisit di file SQL karena Supabase tidak lagi
+  memberikannya otomatis untuk tabel baru.
 - Pesan yang masuk hanya dipakai untuk pendataan; isi chat tidak disimpan
   selain ringkasan data pendaftaran di tabel `umat`.
