@@ -66,7 +66,7 @@ Jangan pernah menempelkan token ke chat, WhatsApp, atau file yang di-commit.
 | `WA_GATEWAY_TOKEN` | Token Fonnte | Fonnte → pilih device → menu **Token** |
 | `WA_WEBHOOK_SECRET` | Kata sandi rahasia buatan sendiri | Bebas, buat yang panjang & acak. Contoh cara membuat: ketik `openssl rand -hex 24` di terminal, atau karang sendiri 30+ karakter campur huruf & angka |
 | `SUPABASE_URL` | Alamat project Supabase | Supabase → Settings → **API** → Project URL (bentuknya `https://xxxxx.supabase.co`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Kunci rahasia Supabase | Supabase → Settings → **API** → `service_role` (klik **Reveal**) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Kunci rahasia Supabase | Supabase → Settings → **API Keys**. Boleh kunci model baru `sb_secret_...` (tab **Publishable and secret API keys**, klik **Reveal**) atau kunci lama `service_role` (JWT). Keduanya bisa dipakai. |
 
 4. **Penting:** untuk setiap variabel, pada bagian **Environments** centang
    **Production** *dan* **Preview** (kalau ada pilihan Development, boleh

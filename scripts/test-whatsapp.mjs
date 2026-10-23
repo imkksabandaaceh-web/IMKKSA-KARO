@@ -12,6 +12,7 @@ import http from 'node:http'
 import { createWhatsappHandler } from '../server/whatsapp/http.ts'
 import { sendViaFonnte } from '../server/whatsapp/fonnte.ts'
 import { normalizePhone } from '../server/whatsapp/phone.ts'
+import { createSupabaseStore } from '../server/whatsapp/store.ts'
 
 const SECRET = 'secret-palsu-untuk-uji-lokal'
 const TOKEN_PALSU = 'token-fonnte-palsu'
@@ -390,6 +391,98 @@ async function main() {
       { lewatHeader: true },
     )
     cek('secret lewat header x-webhook-secret diterima', lewatHeader.status === 200, lewatHeader)
+  }
+
+  // ---------- 7. Kunci rahasia Supabase (model baru, bukan JWT) ----------
+  // Kunci seperti ini hanya boleh dikirim di header `apikey`, bukan Bearer.
+  console.log('\n7) Kunci rahasia Supabase hanya lewat header apikey')
+  {
+    const KUNCI_PALSU = 'kunci-palsu-untuk-uji-header-apikey'
+    const panggilan = []
+    const fetchSupabase = async (url, init = {}) => {
+      panggilan.push({ url: String(url), init })
+      if ((init.method || 'GET') === 'GET') {
+        return new Response('[]', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(null, { status: 204 })
+    }
+
+    const store = createSupabaseStore('https://contoh.supabase.co/', KUNCI_PALSU, fetchSupabase)
+
+    await store.getSession(NOMOR)
+    await store.saveSession({
+      wa_number: NOMOR,
+      state: 'nama',
+      data: { nama: 'Uji' },
+      push_name: 'Uji',
+      updated_at: new Date().toISOString(),
+    })
+    await store.clearSession(NOMOR)
+    await store.findByPhone(NOMOR)
+    await store.insertPendingMember({
+      id: 'pending_uji',
+      nama: 'Uji',
+      status: 'Anggota',
+      alamat: 'Alamat uji',
+      no_hp: NOMOR,
+      photo: '',
+      kk: '',
+      is_pending: true,
+      tempat_lahir: '',
+      tanggal_lahir: '',
+    })
+
+    const headerDari = (entry) => new Headers(entry.init.headers)
+    cek('ada 5 permintaan ke Supabase', panggilan.length === 5, panggilan.length)
+    cek(
+      'setiap permintaan mengirim kunci di header apikey',
+      panggilan.every((entry) => headerDari(entry).get('apikey') === KUNCI_PALSU),
+    )
+    cek(
+      'tidak ada Authorization: Bearer berisi kunci',
+      panggilan.every((entry) => {
+        const auth = headerDari(entry).get('authorization')
+        return !auth || !String(auth).includes(KUNCI_PALSU)
+      }),
+      panggilan.map((entry) => headerDari(entry).get('authorization')),
+    )
+    cek(
+      'semua permintaan menuju /rest/v1 tanpa garis miring ganda',
+      panggilan.every((entry) => entry.url.startsWith('https://contoh.supabase.co/rest/v1/')),
+      panggilan.map((entry) => entry.url),
+    )
+
+    const upsertSesi = panggilan.find(
+      (entry) => entry.init.method === 'POST' && entry.url.includes('/wa_sessions'),
+    )
+    cek(
+      'simpan sesi memakai on_conflict=wa_number + merge-duplicates',
+      Boolean(upsertSesi) &&
+        upsertSesi.url.includes('on_conflict=wa_number') &&
+        headerDari(upsertSesi).get('prefer')?.includes('merge-duplicates') === true,
+      upsertSesi,
+    )
+
+    const hapusSesi = panggilan.find((entry) => entry.init.method === 'DELETE')
+    cek(
+      'hapus sesi memakai filter wa_number=eq.<nomor>',
+      Boolean(hapusSesi) && hapusSesi.url.includes(`wa_number=eq.${NOMOR}`),
+      hapusSesi?.url,
+    )
+
+    const simpanAnggota = panggilan.find(
+      (entry) => entry.init.method === 'POST' && entry.url.endsWith('/umat'),
+    )
+    cek(
+      'simpan anggota mengirim JSON ke tabel umat',
+      Boolean(simpanAnggota) &&
+        JSON.parse(simpanAnggota.init.body).id === 'pending_uji' &&
+        headerDari(simpanAnggota).get('content-type') === 'application/json',
+      simpanAnggota?.init.body,
+    )
   }
 
   server.close()
