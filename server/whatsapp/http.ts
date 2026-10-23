@@ -37,6 +37,8 @@ interface FonntePayload {
   name?: unknown
   device?: unknown
   inboxid?: unknown
+  url?: unknown
+  file?: unknown
 }
 
 const defaultLog = (message: string, detail?: unknown) => {
@@ -143,7 +145,8 @@ export function createWhatsappHandler(options: WhatsappHandlerOptions): WaHttpHa
     }
 
     const teksPesan = ambilString(payload.message) || ambilString(payload.text)
-    if (!teksPesan.trim()) {
+    const mediaUrl = ambilString(payload.url) || ambilString(payload.file)
+    if (!teksPesan.trim() && !mediaUrl) {
       res.status(200).json({ ok: true, ignored: 'tanpa-teks' })
       return
     }
@@ -157,6 +160,7 @@ export function createWhatsappHandler(options: WhatsappHandlerOptions): WaHttpHa
           sender,
           text: teksPesan,
           pushName: ambilString(payload.name) || undefined,
+          mediaUrl: mediaUrl || undefined,
         },
         store,
       )

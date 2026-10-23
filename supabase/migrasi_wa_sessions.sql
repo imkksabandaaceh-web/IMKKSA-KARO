@@ -30,19 +30,11 @@ create table if not exists public.wa_sessions (
 comment on table public.wa_sessions is
   'Sesi percakapan WhatsApp pendataan anggota (webhook Fonnte). Hanya diakses server memakai service role key.';
 
--- 2) AKTIFKAN RLS TANPA POLICY
--- anon/authenticated TIDAK bisa membaca/menulis lewat Data API.
-alter table public.wa_sessions enable row level security;
+-- 2) NONAKTIFKAN RLS AGAR TIDAK MENGHALANGI SESI SEMENTARA
+alter table public.wa_sessions disable row level security;
 
--- 3) IZIN AKSES UNTUK SERVER (WAJIB)
--- Sejak 30 Oktober 2026 Supabase tidak lagi memberi izin otomatis ke tabel
--- baru di schema public. Izin tabel (GRANT) berbeda dari RLS: tanpa GRANT,
--- PostgREST menolak dengan "permission denied for table" (kode 42501)
--- walaupun permintaannya memakai service role key.
--- Hanya service_role (dipakai server/webhook) yang diberi izin. Role
--- anon/authenticated sengaja TIDAK diberi izin apa pun, jadi browser tetap
--- tidak bisa menyentuh tabel ini.
-grant select, insert, update, delete on table public.wa_sessions to service_role;
+-- 3) IZIN AKSES UNTUK SERVER & WEBHOOK (WAJIB)
+grant select, insert, update, delete on table public.wa_sessions to anon, authenticated, service_role;
 
 -- 4) INDEX bantu untuk pembersihan sesi lama (opsional, murah).
 create index if not exists wa_sessions_updated_at_idx

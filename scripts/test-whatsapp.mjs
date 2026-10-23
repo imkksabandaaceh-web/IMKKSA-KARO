@@ -287,7 +287,13 @@ async function main() {
     await kirimWebhook(base, pesanMasuk('17/08/1995'))
     const sesi = await store.getSession(NOMOR)
     cek('tanggal 17/08/1995 disimpan sebagai 1995-08-17', sesi?.data?.tanggal_lahir === '1995-08-17', sesi?.data)
-    cek('state pindah ke konfirmasi', sesi?.state === 'konfirmasi', sesi?.state)
+    cek('lanjut ke pertanyaan pas foto', isiPesan(balasanTerakhir()).includes('Langkah 5'))
+  }
+
+  {
+    await kirimWebhook(base, pesanMasuk('LEWATI'))
+    const sesi = await store.getSession(NOMOR)
+    cek('state pindah ke konfirmasi setelah foto dilewati', sesi?.state === 'konfirmasi', sesi?.state)
     cek('ringkasan menampilkan nama', isiPesan(balasanTerakhir()).includes('bunga br sembiring'))
   }
 
@@ -307,9 +313,9 @@ async function main() {
     cek('is_pending true (menunggu verifikasi admin)', anggota.is_pending === true)
     cek('tempat lahir tersimpan', anggota.tempat_lahir === 'Kabanjahe', anggota.tempat_lahir)
     cek('tanggal lahir format YYYY-MM-DD', anggota.tanggal_lahir === '1995-08-17', anggota.tanggal_lahir)
-    cek('photo & kk kosong', anggota.photo === '' && anggota.kk === '')
-    cek('sesi dihapus setelah selesai', (await store.getSession(NOMOR)) === null)
-    cek('balasan terakhir berterima kasih', isiPesan(balasanTerakhir()).includes('Terima'))
+    cek('photo & kk kosong jika dilewati', anggota.photo === '' && anggota.kk === '')
+    cek('sesi berada di selesai_tambah untuk opsi anggota keluarga', (await store.getSession(NOMOR))?.state === 'selesai_tambah')
+    cek('balasan terakhir berterima kasih dan tawarkan tambah keluarga', isiPesan(balasanTerakhir()).includes('TAMBAH'))
   }
 
   // ---------- 3. Adapter Fonnte ----------
@@ -326,17 +332,45 @@ async function main() {
     cek('tidak memakai kata Bearer', terakhir?.init?.headers?.Authorization === TOKEN_PALSU)
   }
 
-  // ---------- 4. Deteksi nomor ganda ----------
-  console.log('\n4) Deteksi nomor ganda')
+  // ---------- 4. Pendaftaran Anggota Keluarga (Anak/Pasangan) pada Nomor Sama ----------
+  console.log('\n4) Pendaftaran Anggota Keluarga (Anak/Pasangan) pada Nomor Sama')
   {
-    const daftarLagi = await kirimWebhook(base, pesanMasuk('DAFTAR'))
-    cek('nomor yang sudah terdaftar langsung ditolak', daftarLagi.json.replied === true)
-    cek(
-      'balasan menyebut sudah terdaftar',
-      isiPesan(fonnte.terkirim.at(-1)).includes('sudah terdaftar'),
-      isiPesan(fonnte.terkirim.at(-1)),
-    )
-    cek('tidak ada baris kedua yang disimpan', store.disimpan.length === 1)
+    // Dari state selesai_tambah, user mengetik TAMBAH
+    await kirimWebhook(base, pesanMasuk('TAMBAH'))
+    cek('TAMBAH membuka pendaftaran nama anak/keluarga', isiPesan(balasanTerakhir()).includes('Langkah 1'))
+
+    // Isi nama anak
+    await kirimWebhook(base, pesanMasuk('Putra Sembiring'))
+    cek('nama anak diterima dan lanjut alamat', isiPesan(balasanTerakhir()).includes('Langkah 2'))
+
+    // Lewati alamat, tempat lahir, tanggal lahir
+    await kirimWebhook(base, pesanMasuk('LEWATI')) // alamat
+    await kirimWebhook(base, pesanMasuk('Kabanjahe')) // tempat lahir
+    await kirimWebhook(base, pesanMasuk('10-10-2015')) // tanggal lahir
+
+    // Kirim URL foto untuk anak
+    await kirimWebhook(base, pesanMasuk('', { url: 'https://ik.imagekit.io/imkksa/foto_anak.jpg' }))
+    const sesiAnak = await store.getSession(NOMOR)
+    cek('foto anak tersimpan dari mediaUrl', sesiAnak?.data?.photo === 'https://ik.imagekit.io/imkksa/foto_anak.jpg', sesiAnak?.data)
+    cek('state pindah ke konfirmasi', sesiAnak?.state === 'konfirmasi')
+
+    // Konfirmasi YA
+    await kirimWebhook(base, pesanMasuk('YA'))
+    cek('data anak tersimpan sebagai baris ke-2', store.disimpan.length === 2, store.disimpan.length)
+    const anak = store.disimpan[1] || {}
+    cek('nama anak cocok', anak.nama === 'Putra Sembiring', anak.nama)
+    cek('no_hp anak sama dengan orang tua', anak.no_hp === NOMOR, anak.no_hp)
+    cek('foto anak tersimpan di database', anak.photo === 'https://ik.imagekit.io/imkksa/foto_anak.jpg', anak.photo)
+
+    // User selesai mendaftar keluarga
+    await kirimWebhook(base, pesanMasuk('SELESAI'))
+    cek('SELESAI menutup sesi keluarga', (await store.getSession(NOMOR)) === null)
+    cek('pesan penutup ramah', isiPesan(balasanTerakhir()).includes('selesai'))
+
+    // Jika di masa depan nomor yang sama mengetik DAFTAR lagi:
+    await kirimWebhook(base, pesanMasuk('DAFTAR'))
+    cek('DAFTAR pada nomor terdaftar menawarkan opsi TAMBAH', isiPesan(balasanTerakhir()).includes('TAMBAH'))
+    cek('menyebut nama-nama anggota yang sudah terdaftar', isiPesan(balasanTerakhir()).includes('bunga br sembiring') && isiPesan(balasanTerakhir()).includes('Putra Sembiring'))
   }
 
   {
@@ -398,7 +432,7 @@ async function main() {
       isiPesan(fonnte.terkirim.at(-1)).includes('DAFTAR'),
       isiPesan(fonnte.terkirim.at(-1)),
     )
-    cek('tidak ada data tambahan tersimpan', store.disimpan.length === 1)
+    cek('tidak ada data tambahan tersimpan', store.disimpan.length === 2)
   }
 
   // ---------- 6. Pesan acak & secret lewat header ----------
@@ -469,11 +503,8 @@ async function main() {
       panggilan.every((entry) => headerDari(entry).get('apikey') === KUNCI_PALSU),
     )
     cek(
-      'tidak ada Authorization: Bearer berisi kunci',
-      panggilan.every((entry) => {
-        const auth = headerDari(entry).get('authorization')
-        return !auth || !String(auth).includes(KUNCI_PALSU)
-      }),
+      'Authorization: Bearer dikirim untuk kunci standar/JWT',
+      panggilan.every((entry) => headerDari(entry).get('authorization') === `Bearer ${KUNCI_PALSU}`),
       panggilan.map((entry) => headerDari(entry).get('authorization')),
     )
     cek(

@@ -2,7 +2,16 @@
 // Semua tipe di sini "type-only", tidak ada kode yang dijalankan.
 
 /** Langkah percakapan yang mungkin terjadi pada satu nomor WhatsApp. */
-export type WaState = 'idle' | 'nama' | 'alamat' | 'tempat_lahir' | 'tanggal_lahir' | 'konfirmasi'
+export type WaState =
+  | 'idle'
+  | 'tanya_tambah'
+  | 'nama'
+  | 'alamat'
+  | 'tempat_lahir'
+  | 'tanggal_lahir'
+  | 'photo'
+  | 'konfirmasi'
+  | 'selesai_tambah'
 
 /** Data sementara yang dikumpulkan selama percakapan (belum masuk tabel umat). */
 export interface SessionData {
@@ -10,6 +19,7 @@ export interface SessionData {
   alamat?: string
   tempat_lahir?: string
   tanggal_lahir?: string
+  photo?: string
 }
 
 /** Satu baris tabel public.wa_sessions. */

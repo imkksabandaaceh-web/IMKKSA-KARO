@@ -57,9 +57,14 @@ export function createSupabaseStore(
 
   async function request<T>(path: string, options: RestOptions = {}): Promise<T | null> {
     const headers: Record<string, string> = {
-      // Kunci hanya di sini. Jangan tambahkan Authorization: Bearer.
       apikey: serviceRoleKey,
       Accept: 'application/json',
+    }
+    // Jika kunci berupa JWT (dimulai dengan eyJ), PostgREST wajib menyertakan
+    // Authorization: Bearer agar role di PostgreSQL berganti ke service_role.
+    // Jika berupa kunci baru sb_secret_..., gateway membaca dari apikey saja.
+    if (!serviceRoleKey.startsWith('sb_')) {
+      headers.Authorization = `Bearer ${serviceRoleKey}`
     }
     if (options.body !== undefined) headers['Content-Type'] = 'application/json'
     if (options.prefer) headers.Prefer = options.prefer
