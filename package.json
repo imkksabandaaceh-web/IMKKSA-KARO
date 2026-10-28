@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "check:rls": "node scripts/check-rls-registration.mjs",
+    "prebuild": "npm run check:rls",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

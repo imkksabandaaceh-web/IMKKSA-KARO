@@ -23,6 +23,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Jalur pendaftaran /daftar wajib INSERT murni (RLS anon hanya punya policy
+      # INSERT dengan is_pending = true). Cek ini juga jalan otomatis lewat
+      # `npm run prebuild`, sehingga build Vercel ikut gagal bila kontrak rusak.
+      - name: Cek kontrak RLS jalur /daftar (blocking)
+        run: npm run check:rls
+
       - name: Lint (advisory)
         run: npm run lint || echo "⚠️ Lint warnings found (non-blocking)"
         continue-on-error: true
