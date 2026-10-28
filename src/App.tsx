@@ -2334,30 +2334,6 @@ function App() {
                             <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
                           </div>
                         )}
-
-                        <p className="mandiri-q mandiri-q-second">Kartu Keluarga (opsional)</p>
-                        <p className="mandiri-h">Bila ada, unggah foto KK agar pengurus bisa mencocokkan data keluarga.</p>
-                        <label className="mandiri-upload">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleFileChange(e, 'kk', false)}
-                            disabled={uploadingField?.form === 'user' && uploadingField?.field === 'kk'}
-                          />
-                          <span className="mandiri-upload-icon">🪪</span>
-                          <span>
-                            {userUmatForm.kk ? 'KK sudah dipilih — tekan untuk mengganti' : 'Tekan di sini untuk memilih foto KK'}
-                          </span>
-                        </label>
-                        {uploadingField?.form === 'user' && uploadingField?.field === 'kk' && (
-                          <p className="mandiri-h">⏳ Mengunggah Kartu Keluarga...</p>
-                        )}
-                        {userUmatForm.kk && (
-                          <div className="mandiri-preview">
-                            <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="mandiri-kk-preview" width={220} height={150} />
-                            <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, kk: '' })}>Hapus KK</button>
-                          </div>
-                        )}
                       </>
                     )}
 
@@ -2373,7 +2349,6 @@ function App() {
                             .filter(Boolean).join(', ') || '-'}
                           <b>Alamat</b>{userUmatForm.alamat || '-'}
                           <b>Pas Foto</b>{userUmatForm.photo ? 'Sudah ada' : 'Belum ada'}
-                          <b>Kartu Keluarga</b>{userUmatForm.kk ? 'Sudah ada' : 'Belum ada'}
                         </div>
                       </>
                     )}

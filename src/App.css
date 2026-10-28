@@ -1710,8 +1710,6 @@ button {
   color: var(--primary-color);
 }
 
-.mandiri-q-second { margin-top: 26px; font-size: 1.2rem; }
-
 .mandiri-h {
   font-size: 1rem;
   color: #6b6b66;
@@ -1786,13 +1784,6 @@ button {
   height: 225px;
   aspect-ratio: 2 / 3;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-.mandiri-kk-preview {
-  width: 220px;
-  height: auto;
   border-radius: 8px;
   border: 1px solid #ddd;
 }
