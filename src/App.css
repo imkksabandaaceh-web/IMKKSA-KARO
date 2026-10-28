@@ -1666,3 +1666,206 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* Form pendataan mandiri — satu pertanyaan per layar (gaya huruf besar) */
+.modal-content.mandiri-form {
+  max-width: 720px;
+  width: min(720px, 96vw);
+  padding: 34px 26px 26px;
+  max-height: 94vh;
+  background: var(--surface-1, #f7f7f4);
+}
+
+.mandiri-card {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.mandiri-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mandiri-bar i {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: #d8d7d0;
+}
+
+.mandiri-bar i.on { background: var(--secondary-color); }
+
+.mandiri-stepcount {
+  font-size: 0.88rem;
+  color: #6b6b66;
+  margin: 0 0 10px;
+}
+
+.mandiri-q {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 8px;
+  color: var(--primary-color);
+}
+
+.mandiri-q-second { margin-top: 26px; font-size: 1.2rem; }
+
+.mandiri-h {
+  font-size: 1rem;
+  color: #6b6b66;
+  margin: 0 0 16px;
+  line-height: 1.45;
+}
+
+.mandiri-input {
+  width: 100%;
+  height: 60px;
+  font-size: 1.2rem;
+  padding: 0 16px;
+  border: 1px solid #cfcec7;
+  border-radius: 10px;
+  background: #fff;
+  color: #1b1b19;
+  box-sizing: border-box;
+  font-family: inherit;
+  margin-bottom: 10px;
+}
+
+.mandiri-textarea {
+  height: auto;
+  min-height: 120px;
+  padding: 14px 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.mandiri-input:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+}
+
+.mandiri-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 130px;
+  padding: 18px;
+  border: 2px dashed #c9c8c0;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+  font-size: 1rem;
+  color: #52514e;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mandiri-upload:hover {
+  border-color: var(--secondary-color);
+  background: #fffdf6;
+}
+
+.mandiri-upload input[type="file"] { display: none; }
+.mandiri-upload-icon { font-size: 2rem; line-height: 1; }
+
+.mandiri-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.mandiri-photo-preview {
+  width: 150px;
+  height: 225px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.mandiri-kk-preview {
+  width: 220px;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.mandiri-sum {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  color: #1b1b19;
+  word-break: break-word;
+}
+
+.mandiri-sum b {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b6b66;
+  margin-top: 12px;
+}
+
+.mandiri-sum b:first-child { margin-top: 0; }
+
+.mandiri-err {
+  min-height: 22px;
+  margin: 10px 0 0;
+  font-size: 0.95rem;
+  color: #b3261e;
+}
+
+.mandiri-nav {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.mandiri-btn {
+  flex: 1;
+  min-height: 58px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter 0.15s, background 0.15s;
+}
+
+.mandiri-btn-primary {
+  background: var(--secondary-color);
+  color: var(--primary-color);
+  border: none;
+}
+
+.mandiri-btn-primary:hover:not(:disabled) { filter: brightness(0.94); }
+.mandiri-btn-primary:disabled { opacity: 0.6; cursor: progress; }
+
+.mandiri-btn-secondary {
+  background: #fff;
+  color: #383835;
+  border: 1px solid #cfcec7;
+}
+
+.mandiri-btn-secondary:hover { background: #f4f4f0; }
+
+@media (max-width: 640px) {
+  .modal-content.mandiri-form {
+    width: 100%;
+    padding: 26px 16px 18px;
+    max-height: 96vh;
+  }
+
+  .mandiri-q { font-size: 1.35rem; }
+  .mandiri-nav { flex-direction: column-reverse; }
+}

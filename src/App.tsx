@@ -9,13 +9,16 @@ const AlbumGallery = lazy(() => import('./components/GaleriView'))
 const BerkasView = lazy(() => import('./components/BerkasView'))
 import './App.css'
 import { umatService } from './services/umat'
-import { compressImage, toImageKitUrl } from './utils/imageUtils'
+import { compressImage, compressToPassportPhoto, toImageKitUrl } from './utils/imageUtils'
 import type { FileFolder } from './components/BerkasView'
 
 // Jumlah salinan teks di banner pengumuman supaya animasi marquee tetap
 // penuh (tidak ada ruang kosong) di layar lebar sekalipun.
 const ANNOUNCEMENT_MARQUEE_COPIES = 8;
 const ANNOUNCEMENT_DEFAULT_BG = '#0d1a13';
+
+// Langkah formulir pendataan mandiri (pengunjung non-admin).
+const MANDIRI_STEPS = ['Nama', 'No. HP', 'Kelahiran', 'Alamat', 'Dokumen', 'Ringkasan'];
 
 // Durasi satu putaran teks banner (detik). Nilai dari A.Panel bisa berupa
 // string bebas, jadi dibatasi ke rentang wajar dan fallback ke 20 detik.
@@ -469,6 +472,10 @@ function App() {
   const [userSubmitMessage, setUserSubmitMessage] = useState<string | null>(null)
 
   const [isSubmittingUserForm, setIsSubmittingUserForm] = useState(false)
+  // Langkah aktif form pendataan mandiri (1..MANDIRI_STEPS.length)
+  const [userFormStep, setUserFormStep] = useState(1)
+  // Pesan kesalahan inline pada langkah form mandiri yang sedang aktif
+  const [userFormError, setUserFormError] = useState<string | null>(null)
   const [selectedUmat, setSelectedUmat] = useState<UmatRecord | null>(null)
   // Field foto/KK yang sedang diunggah ke Google Drive (form admin atau publik)
   const [uploadingField, setUploadingField] = useState<null | { form: 'admin' | 'user'; field: 'photo' | 'kk' }>(null)
@@ -1071,6 +1078,19 @@ function App() {
     setShowUserForm(false);
     setUserSubmitMessage(null);
   }
+  // Validasi tiap layar; pesan tampil inline seperti mock form lansia.
+  const handleUserStepNext = () => {
+    if (userFormStep === 1 && !userUmatForm.nama.trim()) {
+      setUserFormError('Isi dulu nama lengkapnya, ya.');
+      return;
+    }
+    if (userFormStep === 2 && userUmatForm.noHp.trim() && !/^[0-9+]{9,15}$/.test(userUmatForm.noHp.trim())) {
+      setUserFormError('Nomor HP hanya angka, minimal 9 digit.');
+      return;
+    }
+    setUserFormError(null);
+    setUserFormStep(step => Math.min(step + 1, MANDIRI_STEPS.length));
+  }
 
   const handleUserFormSubmit = async () => {
     if (!userUmatForm.nama.trim()) {
@@ -1110,6 +1130,8 @@ function App() {
     } finally {
       setIsSubmittingUserForm(false);
       setShowUserForm(false);
+      setUserFormStep(1);
+      setUserFormError(null);
       setUserUmatForm({ nama: '', status: 'Anggota', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
     }
   }
@@ -1682,9 +1704,11 @@ function App() {
 
     try {
       const base64 = await readFileAsBase64(file);
-      // Pas foto cukup 500px; KK perlu lebih besar supaya tetap terbaca jelas.
-      const maxWidth = field === 'kk' ? 800 : 500;
-      const compressed = await compressImage(base64, maxWidth, 0.6);
+      // Pas foto diseragamkan 4x6 (crop tengah, 300x450 px, JPEG q0.6) agar hemat
+      // kapasitas Drive; KK tetap 800px supaya tulisan masih terbaca jelas.
+      const compressed = field === 'photo'
+        ? await compressToPassportPhoto(base64)
+        : await compressImage(base64, 800, 0.6);
       const url = await uploadBase64ToDrive(compressed, 'IMKKSA_Anggota_Dokumen');
       if (isAdmin) {
         setUmatForm(prev => ({ ...prev, [field]: url }));
@@ -2126,6 +2150,25 @@ function App() {
               )}
             </div>
 
+            <div className="user-mandiri-cta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', marginBottom: '22px', padding: '16px 18px', background: '#f1f8ff', border: '1px solid #cfe3fb', borderRadius: '10px' }}>
+              <p style={{ margin: 0, color: '#334155', fontSize: '0.92rem' }}>
+                Nama Anda belum terdaftar? Silakan isi data secara mandiri untuk mendaftar.
+              </p>
+              <button
+                className="btn-save"
+                onClick={() => {
+                  setUserUmatForm({ nama: '', status: 'Anggota', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' });
+                  setUserFormStep(1);
+                  setUserFormError(null);
+                  setShowUserForm(true);
+                  setUserSubmitMessage(null);
+                }}
+                style={{ textTransform: 'none', fontSize: '1rem', padding: '12px 28px', whiteSpace: 'nowrap' }}
+              >
+                📝 Isi secara mandiri
+              </button>
+            </div>
+
             <div className="search-results-section">
               <div className="table-responsive">
                 <table className="umat-table">
@@ -2178,144 +2221,196 @@ function App() {
                 </table>
               </div>
 
-              {userHasQueried && filteredUserUmat.length === 0 && (
-                <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
-                  <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '15px' }}>
-                    Nama Anda belum terdaftar? Silakan isi data secara mandiri untuk mendaftar.
-                  </p>
-                  <button 
-                    className="btn-save" 
-                    onClick={() => { 
-                      setUserUmatForm({ nama: '', status: 'Anggota', alamat: '', noHp: '', photo: '', kk: '', tempatLahir: '', tanggalLahir: '' }); 
-                      setShowUserForm(true); 
-                      setUserSubmitMessage(null); 
-                    }}
-                    style={{ textTransform: 'none', fontSize: '1rem', padding: '12px 30px' }}
-                  >
-                    📝 Isi secara mandiri
-                  </button>
-                </div>
-              )}
             </div>
 
             {showUserForm && (
               <div className="modal-overlay" onClick={() => setShowUserForm(false)}>
-                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: '30px' }}>
+                <div className="modal-content mandiri-form" onClick={e => e.stopPropagation()}>
                   <button className="modal-header-btn" onClick={() => setShowUserForm(false)}>✕</button>
-                  <h3 style={{ borderBottom: '2px solid var(--secondary-color)', paddingBottom: '10px', marginTop: 0, color: 'var(--primary-color)' }}>
-                    Lengkapi Data Anggota Mandiri
-                  </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '20px' }}>
-                    Silakan isi formulir di bawah ini dengan lengkap. Data yang dikirim akan tersimpan di Google Drive dan masuk ke antrean verifikasi Admin.
-                  </p>
-                  
-                  <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
-                    <div className="form-group">
-                      <label>Nama Anggota <span style={{ color: 'red' }}>*</span>:</label>
-                      <input 
-                        type="text" 
-                        value={userUmatForm.nama} 
-                        onChange={e => setUserUmatForm({ ...userUmatForm, nama: e.target.value })} 
-                        required 
-                        placeholder="Nama Lengkap Anda"
-                      />
+
+                  <div className="mandiri-card">
+                    <div className="mandiri-bar">
+                      {MANDIRI_STEPS.map((label, i) => (
+                        <i key={label} className={i < userFormStep ? 'on' : ''} />
+                      ))}
                     </div>
-                    <div className="form-group">
-                      <label>No. HP / WhatsApp (Opsional):</label>
-                      <input 
-                        type="text" 
-                        value={userUmatForm.noHp} 
-                        onChange={e => setUserUmatForm({ ...userUmatForm, noHp: e.target.value })} 
-                        placeholder="Contoh: 081234567890"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Tempat Lahir (Opsional):</label>
-                      <input 
-                        type="text" 
-                        value={userUmatForm.tempatLahir || ''} 
-                        onChange={e => setUserUmatForm({ ...userUmatForm, tempatLahir: e.target.value })} 
-                        placeholder="Kota atau Kabupaten tempat Anda lahir"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Tanggal Lahir (Opsional):</label>
-                      <input 
-                        type="date" 
-                        value={userUmatForm.tanggalLahir || ''} 
-                        onChange={e => setUserUmatForm({ ...userUmatForm, tanggalLahir: e.target.value })} 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Alamat Lengkap (Opsional):</label>
-                      <textarea 
-                        value={userUmatForm.alamat} 
-                        onChange={e => setUserUmatForm({ ...userUmatForm, alamat: e.target.value })} 
-                        placeholder="Alamat domisili saat ini di Banda Aceh dan sekitarnya"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
+                    <p className="mandiri-stepcount">Langkah {userFormStep} dari {MANDIRI_STEPS.length}</p>
+
+                    {userFormStep === 1 && (
                       <>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={(e) => handleFileChange(e, 'photo', false)} 
-                          disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
+                        <p className="mandiri-q">Siapa nama lengkap Bapak/Ibu?</p>
+                        <p className="mandiri-h">Ketik nama sesuai KTP atau ijazah.</p>
+                        <input
+                          className="mandiri-input"
+                          type="text"
+                          value={userUmatForm.nama}
+                          onChange={e => { setUserUmatForm({ ...userUmatForm, nama: e.target.value }); setUserFormError(null); }}
+                          placeholder="Contoh: Budi Sembiring"
+                          autoComplete="name"
                         />
-                        {uploadingField?.form === 'user' && uploadingField?.field === 'photo' && (
-                          <div className="upload-status">⏳ Mengunggah pas foto ke Google Drive...</div>
-                        )}
                       </>
-                      {userUmatForm.photo && (
-                        <div className="preview-container">
-                          <img
-                            src={toImageKitUrl(userUmatForm.photo, 400)}
-                            alt="Preview Foto"
-                            className="file-preview-img"
-                            width={400}
-                            height={400}
-                            style={{ objectFit: 'cover', objectPosition: 'top center' }}
+                    )}
+
+                    {userFormStep === 2 && (
+                      <>
+                        <p className="mandiri-q">Berapa nomor HP Bapak/Ibu?</p>
+                        <p className="mandiri-h">Nomor yang bisa dihubungi pengurus. Boleh dikosongkan.</p>
+                        <input
+                          className="mandiri-input"
+                          type="tel"
+                          inputMode="numeric"
+                          value={userUmatForm.noHp}
+                          onChange={e => { setUserUmatForm({ ...userUmatForm, noHp: e.target.value }); setUserFormError(null); }}
+                          placeholder="Contoh: 081234567890"
+                          autoComplete="tel"
+                        />
+                      </>
+                    )}
+
+                    {userFormStep === 3 && (
+                      <>
+                        <p className="mandiri-q">Kapan dan di mana Bapak/Ibu lahir?</p>
+                        <p className="mandiri-h">Boleh dikosongkan bila lupa.</p>
+                        <input
+                          className="mandiri-input"
+                          type="text"
+                          value={userUmatForm.tempatLahir || ''}
+                          onChange={e => setUserUmatForm({ ...userUmatForm, tempatLahir: e.target.value })}
+                          placeholder="Tempat lahir — contoh: Kabanjahe"
+                        />
+                        <input
+                          className="mandiri-input"
+                          type="date"
+                          value={userUmatForm.tanggalLahir || ''}
+                          onChange={e => setUserUmatForm({ ...userUmatForm, tanggalLahir: e.target.value })}
+                        />
+                      </>
+                    )}
+
+                    {userFormStep === 4 && (
+                      <>
+                        <p className="mandiri-q">Di mana alamat Bapak/Ibu?</p>
+                        <p className="mandiri-h">Alamat domisili sekarang di Banda Aceh dan sekitarnya.</p>
+                        <textarea
+                          className="mandiri-input mandiri-textarea"
+                          rows={4}
+                          value={userUmatForm.alamat}
+                          onChange={e => setUserUmatForm({ ...userUmatForm, alamat: e.target.value })}
+                          placeholder="Contoh: Desa, kecamatan, kabupaten"
+                        />
+                      </>
+                    )}
+
+                    {userFormStep === 5 && (
+                      <>
+                        <p className="mandiri-q">Tambahkan pas foto Bapak/Ibu</p>
+                        <p className="mandiri-h">Foto otomatis dipotong ke ukuran 4x6 dan dikompres.</p>
+                        <label className="mandiri-upload">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, 'photo', false)}
+                            disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
                           />
-                          <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="form-group">
-                      <label>Upload KK (Kartu Keluarga - Opsional, Maksimal 5 MB):</label>
-                      <>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={(e) => handleFileChange(e, 'kk', false)} 
-                          disabled={uploadingField?.form === 'user' && uploadingField?.field === 'kk'}
-                        />
+                          <span className="mandiri-upload-icon">📷</span>
+                          <span>
+                            {userUmatForm.photo
+                              ? 'Pas foto sudah dipilih — tekan untuk mengganti'
+                              : 'Tekan di sini untuk memilih pas foto'}
+                          </span>
+                        </label>
+                        {uploadingField?.form === 'user' && uploadingField?.field === 'photo' && (
+                          <p className="mandiri-h">⏳ Mengunggah pas foto...</p>
+                        )}
+                        {userUmatForm.photo && (
+                          <div className="mandiri-preview">
+                            <img
+                              src={toImageKitUrl(userUmatForm.photo, 300)}
+                              alt="Preview Pas Foto 4x6"
+                              width={150}
+                              height={225}
+                              className="mandiri-photo-preview"
+                            />
+                            <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, photo: '' })}>Hapus Foto</button>
+                          </div>
+                        )}
+
+                        <p className="mandiri-q mandiri-q-second">Kartu Keluarga (opsional)</p>
+                        <p className="mandiri-h">Bila ada, unggah foto KK agar pengurus bisa mencocokkan data keluarga.</p>
+                        <label className="mandiri-upload">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileChange(e, 'kk', false)}
+                            disabled={uploadingField?.form === 'user' && uploadingField?.field === 'kk'}
+                          />
+                          <span className="mandiri-upload-icon">🪪</span>
+                          <span>
+                            {userUmatForm.kk ? 'KK sudah dipilih — tekan untuk mengganti' : 'Tekan di sini untuk memilih foto KK'}
+                          </span>
+                        </label>
                         {uploadingField?.form === 'user' && uploadingField?.field === 'kk' && (
-                          <div className="upload-status">⏳ Mengunggah Kartu Keluarga ke Google Drive...</div>
+                          <p className="mandiri-h">⏳ Mengunggah Kartu Keluarga...</p>
+                        )}
+                        {userUmatForm.kk && (
+                          <div className="mandiri-preview">
+                            <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="mandiri-kk-preview" width={220} height={150} />
+                            <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, kk: '' })}>Hapus KK</button>
+                          </div>
                         )}
                       </>
-                      {userUmatForm.kk && (
-                        <div className="preview-container">
-                          <img src={toImageKitUrl(userUmatForm.kk, 400)} alt="Preview KK" className="file-preview-img" width={400} height={300} />
-                          <button type="button" className="btn-remove-file" onClick={() => setUserUmatForm({ ...userUmatForm, kk: '' })}>Hapus KK</button>
+                    )}
+
+                    {userFormStep === 6 && (
+                      <>
+                        <p className="mandiri-q">Periksa data Bapak/Ibu</p>
+                        <p className="mandiri-h">Setelah dikirim, data masuk ke antrean verifikasi Admin.</p>
+                        <div className="mandiri-sum">
+                          <b>Nama</b>{userUmatForm.nama || '-'}
+                          <b>No. HP</b>{userUmatForm.noHp || '-'}
+                          <b>Tempat, Tanggal Lahir</b>
+                          {[userUmatForm.tempatLahir, userUmatForm.tanggalLahir ? formatDateDevice(userUmatForm.tanggalLahir) : '']
+                            .filter(Boolean).join(', ') || '-'}
+                          <b>Alamat</b>{userUmatForm.alamat || '-'}
+                          <b>Pas Foto</b>{userUmatForm.photo ? 'Sudah ada' : 'Belum ada'}
+                          <b>Kartu Keluarga</b>{userUmatForm.kk ? 'Sudah ada' : 'Belum ada'}
                         </div>
+                      </>
+                    )}
+
+                    <p className="mandiri-err">{userFormError || '\u00a0'}</p>
+
+                    <div className="mandiri-nav">
+                      {userFormStep > 1 && (
+                        <button
+                          type="button"
+                          className="mandiri-btn mandiri-btn-secondary"
+                          onClick={() => { setUserFormError(null); setUserFormStep(step => Math.max(1, step - 1)); }}
+                        >
+                          ← Kembali
+                        </button>
+                      )}
+                      {userFormStep < MANDIRI_STEPS.length ? (
+                        <button type="button" className="mandiri-btn mandiri-btn-primary" onClick={handleUserStepNext}>
+                          Lanjut
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="mandiri-btn mandiri-btn-primary"
+                          onClick={handleUserFormSubmit}
+                          disabled={isSubmittingUserForm}
+                        >
+                          {isSubmittingUserForm ? 'Mengirim...' : 'Kirim Data'}
+                        </button>
                       )}
                     </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '30px' }}>
-                    <button className="btn-delete" onClick={() => setShowUserForm(false)} style={{ textTransform: 'none' }}>
-                      Batal
-                    </button>
-                    <button className="btn-save" onClick={handleUserFormSubmit} disabled={isSubmittingUserForm} style={{ textTransform: 'none' }}>
-                      {isSubmittingUserForm ? 'Mengirim...' : 'Kirim Data'}
-                    </button>
                   </div>
                 </div>
               </div>
             )}
-            
-            {userSubmitMessage && (
+
+                                    {userSubmitMessage && (
               <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: '600', border: '1px solid #c8e6c9' }}>
                 {userSubmitMessage}
               </div>
