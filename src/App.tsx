@@ -1950,12 +1950,33 @@ function App() {
                 </div>
                 <div className="form-group">
                   <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
-                  <>
-                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'photo', true)} disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'photo'} />
-                    {uploadingField?.form === 'admin' && uploadingField?.field === 'photo' && (
-                      <div className="upload-status">⏳ Mengunggah pas foto ke Google Drive...</div>
-                    )}
-                  </>
+                  {/* Dua pilihan sumber foto, sama seperti form mandiri: kamera atau galeri HP */}
+                  <div className="mandiri-upload-choices">
+                    <label className="mandiri-upload">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        onChange={(e) => handleFileChange(e, 'photo', true)}
+                        disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'photo'}
+                      />
+                      <span className="mandiri-upload-icon">📷</span>
+                      <span>Ambil Foto (Kamera)</span>
+                    </label>
+                    <label className="mandiri-upload">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(e, 'photo', true)}
+                        disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'photo'}
+                      />
+                      <span className="mandiri-upload-icon">🖼️</span>
+                      <span>Pilih dari Galeri HP</span>
+                    </label>
+                  </div>
+                  {uploadingField?.form === 'admin' && uploadingField?.field === 'photo' && (
+                    <div className="upload-status">⏳ Mengunggah pas foto ke Google Drive...</div>
+                  )}
                   {umatForm.photo && (
                     <div className="preview-container">
                       <img
