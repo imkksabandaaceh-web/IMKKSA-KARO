@@ -9,6 +9,7 @@ const AlbumGallery = lazy(() => import('./components/GaleriView'))
 const BerkasView = lazy(() => import('./components/BerkasView'))
 import './App.css'
 import { umatService } from './services/umat'
+import { umatOutbox } from './utils/umatOutbox'
 import { compressImage, compressToPassportPhoto, toImageKitUrl } from './utils/imageUtils'
 import type { FileFolder } from './components/BerkasView'
 
@@ -721,6 +722,86 @@ function App() {
     }
   }, [])
 
+  // ── Antrean pendaftaran lokal (outbox) ──────────────────────────────────
+  // Kalau penyimpanan ke Supabase gagal (offline / server error), data pendaftar
+  // tidak dibuang: disimpan di localStorage lalu dikirim ulang otomatis di sini.
+  const outboxFlushRef = useRef(false)
+
+  // Notifikasi email ke admin setiap ada pendaftaran baru. Fire-and-forget:
+  // kegagalan notifikasi tidak boleh menggagalkan penyimpanan data pendaftar.
+  // Dipakai dua jalur: kirim langsung (handleUserFormSubmit) dan kirim ulang
+  // antrean lokal (flushUmatOutbox). Apps Script membatasi 1 email per id per
+  // 6 jam, jadi pengiriman ganda tidak membanjiri admin.
+  const kirimNotifikasiPendaftaran = useCallback(async (record: UmatRecord) => {
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'kirimNotifikasiPendaftaran',
+          data: { id: record.id, nama: record.nama, noHp: record.noHp || '', alamat: record.alamat || '' }
+        })
+      })
+    } catch (err) {
+      console.error('Gagal kirim notifikasi admin:', err)
+    }
+  }, [])
+
+  const flushUmatOutbox = useCallback(async (): Promise<number> => {
+    if (outboxFlushRef.current) return 0 // cegah dua flush berjalan bersamaan
+    const queued = umatOutbox.queued()
+    if (queued.length === 0) return 0
+
+    outboxFlushRef.current = true
+    let sent = 0
+    try {
+      for (const record of queued) {
+        try {
+          // ON CONFLICT DO NOTHING → idempoten: kalau kiriman sebelumnya ternyata
+          // sudah masuk (respons hilang karena timeout), tidak error dan antrean
+          // tidak macet walau RLS publik hanya mengizinkan INSERT (bukan UPDATE).
+          await umatService.insertIfAbsent([record])
+          umatOutbox.remove(record.id)
+          sent++
+          // Pendaftaran yang baru masuk lewat antrean pun harus memicu email admin.
+          void kirimNotifikasiPendaftaran(record)
+        } catch (err) {
+          // Masih gagal (biasanya jaringan) → catat penyebabnya lalu berhenti;
+          // percobaan berikutnya menunggu event online / jadwal retry berkala.
+          umatOutbox.markFailed(record.id, err instanceof Error ? err.message : String(err))
+          break
+        }
+      }
+    } finally {
+      outboxFlushRef.current = false
+    }
+
+    if (sent > 0) {
+      console.log(`[umatOutbox] ${sent} pendaftaran tertunda berhasil dikirim ke Supabase.`)
+      if (isLoggedInRef.current) loadUmat({ silent: true })
+    }
+    return sent
+  }, [loadUmat, kirimNotifikasiPendaftaran])
+
+  // Retry otomatis: saat halaman dibuka, saat jaringan kembali online, dan tiap
+  // 60 detik SELAMA antrean masih berisi (tidak membebani Supabase bila kosong).
+  useEffect(() => {
+    flushUmatOutbox()
+    window.addEventListener('online', flushUmatOutbox)
+
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible' && umatOutbox.count() > 0) {
+        flushUmatOutbox()
+      }
+    }, 60000)
+
+    return () => {
+      window.removeEventListener('online', flushUmatOutbox)
+      clearInterval(intervalId)
+    }
+  }, [flushUmatOutbox])
+
   // Muat ulang umat dari Supabase saat halaman dibuka & saat status login berubah.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pemuatan data async via fetch (pola fetch-on-mount standar React)
@@ -1121,24 +1202,16 @@ function App() {
 
     try {
       await umatService.upsert([pendingRecord]);
+      umatOutbox.remove(pendingRecord.id); // pastikan tidak ada sisa antrean dobel
       setUserSubmitMessage('Data berhasil dikirim! Menunggu verifikasi Admin.');
 
-      // Notifikasi email ke admin (fire-and-forget, tidak mengganggu alur pengguna)
-      try {
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({
-            action: 'kirimNotifikasiPendaftaran',
-            data: { id: pendingRecord.id, nama: pendingRecord.nama, noHp: pendingRecord.noHp || '', alamat: pendingRecord.alamat || '' }
-          })
-        });
-      } catch (err) {
-        console.error('Gagal kirim notifikasi admin:', err);
-      }
-    } catch {
-      setUserSubmitMessage('Gagal terkirim ke server. Data tersimpan lokal, silakan coba lagi nanti.');
+      // Notifikasi email ke admin (fire-and-forget, tidak menahan layar "Mengirim...")
+      void kirimNotifikasiPendaftaran(pendingRecord);
+    } catch (error) {
+      // Supabase gagal (offline / server error) → data jangan sampai hilang:
+      // masuk antrean lokal dan dikirim ulang otomatis saat koneksi pulih.
+      umatOutbox.enqueue(pendingRecord, error instanceof Error ? error.message : String(error))
+      setUserSubmitMessage('Koneksi ke server sedang bermasalah. Data Bapak/Ibu sudah tersimpan di perangkat ini dan akan dikirim otomatis saat koneksi pulih — tidak perlu mengisi ulang.');
     } finally {
       setIsSubmittingUserForm(false);
       setShowUserForm(false);
@@ -2316,21 +2389,34 @@ function App() {
                     {userFormStep === 5 && (
                       <>
                         <p className="mandiri-q">Tambahkan pas foto Bapak/Ibu</p>
-                        <p className="mandiri-h">Foto otomatis dipotong ke ukuran 4x6 dan dikompres.</p>
-                        <label className="mandiri-upload">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleFileChange(e, 'photo', false)}
-                            disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
-                          />
-                          <span className="mandiri-upload-icon">📷</span>
-                          <span>
-                            {userUmatForm.photo
-                              ? 'Pas foto sudah dipilih — tekan untuk mengganti'
-                              : 'Tekan di sini untuk memilih pas foto'}
-                          </span>
-                        </label>
+                        <p className="mandiri-h">Foto otomatis dipotong ke ukuran 4x6 dan dikompres. Pilih dari galeri HP bila fotonya sudah ada.</p>
+                        {/* Dua pilihan sumber foto: kamera langsung, atau foto yang sudah ada di galeri HP */}
+                        <div className="mandiri-upload-choices">
+                          <label className="mandiri-upload">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="user"
+                              onChange={(e) => handleFileChange(e, 'photo', false)}
+                              disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
+                            />
+                            <span className="mandiri-upload-icon">📷</span>
+                            <span>Ambil Foto (Kamera)</span>
+                          </label>
+                          <label className="mandiri-upload">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleFileChange(e, 'photo', false)}
+                              disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
+                            />
+                            <span className="mandiri-upload-icon">🖼️</span>
+                            <span>Pilih dari Galeri HP</span>
+                          </label>
+                        </div>
+                        {userUmatForm.photo && !uploadingField && (
+                          <p className="mandiri-h">Pas foto sudah ada — tekan salah satu pilihan di atas untuk menggantinya.</p>
+                        )}
                         {uploadingField?.form === 'user' && uploadingField?.field === 'photo' && (
                           <p className="mandiri-h">⏳ Mengunggah pas foto...</p>
                         )}

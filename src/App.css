@@ -1771,6 +1771,17 @@ button {
 .mandiri-upload input[type="file"] { display: none; }
 .mandiri-upload-icon { font-size: 2rem; line-height: 1; }
 
+/* Dua pilihan sumber pas foto: kamera langsung atau galeri HP */
+.mandiri-upload-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .mandiri-upload-choices { grid-template-columns: 1fr; }
+}
+
 .mandiri-preview {
   display: flex;
   flex-direction: column;

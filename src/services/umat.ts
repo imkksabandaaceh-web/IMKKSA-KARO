@@ -111,6 +111,19 @@ export const umatService = {
     if (error) throw error
   },
 
+  /**
+   * Khusus pengiriman ulang antrean lokal (outbox): INSERT ... ON CONFLICT DO
+   * NOTHING, jadi aman dipanggil berulang. Tidak menyentuh baris yang sudah ada
+   * (RLS publik hanya mengizinkan INSERT, bukan UPDATE).
+   */
+  async insertIfAbsent(list: UmatRecord[]): Promise<void> {
+    if (!list || list.length === 0) return
+    const { error } = await supabase
+      .from('umat')
+      .upsert(list.map(toDb), { onConflict: 'id', ignoreDuplicates: true })
+    if (error) throw error
+  },
+
   /** Hapus satu anggota berdasarkan id. */
   async remove(id: string): Promise<void> {
     const { error } = await supabase
