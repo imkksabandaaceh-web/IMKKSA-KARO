@@ -480,6 +480,18 @@ function App() {
   // Field foto/KK yang sedang diunggah ke Google Drive (form admin atau publik)
   const [uploadingField, setUploadingField] = useState<null | { form: 'admin' | 'user'; field: 'photo' | 'kk' }>(null)
 
+  // Link pendek pendaftaran mandiri: /daftar (atau /#daftar) langsung membuka
+  // formulir satu-pertanyaan-per-layar tanpa perlu mencari nama lebih dulu.
+  useEffect(() => {
+    const path = window.location.pathname.replace(/\/+$/, '')
+    const dariLinkDaftar = path === '/daftar' || window.location.hash === '#daftar'
+    if (!dariLinkDaftar) return
+    setActiveTab('Data Anggota')
+    setUserFormStep(1)
+    setUserFormError(null)
+    setShowUserForm(true)
+  }, [])
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   useEffect(() => {
     setIsMobileMenuOpen(false)

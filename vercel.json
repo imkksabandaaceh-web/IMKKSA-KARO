@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/daftar", "destination": "/index.html" },
+    { "source": "/daftar/(.*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
