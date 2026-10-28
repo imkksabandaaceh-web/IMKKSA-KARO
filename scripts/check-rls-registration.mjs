@@ -128,8 +128,12 @@ server.on('connection', (socket) => {
 await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve))
 
 try {
+  // WebSocket tiruan: supabase-js butuh WebSocket native di Node 22+, sedangkan CI
+  // memakai Node 20. Realtime tidak dipakai di sini, jadi cukup diisi stub.
+  class StubWebSocket { close() {} send() {} }
   const client = createClient(`http://127.0.0.1:${port}`, 'anon-key-uji', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    realtime: { transport: StubWebSocket },
   })
   const baris = { id: 'pending_uji', nama: 'Uji', status: 'Anggota', alamat: '', no_hp: '', photo: '', kk: '', is_pending: true, tempat_lahir: '', tanggal_lahir: '' }
 
