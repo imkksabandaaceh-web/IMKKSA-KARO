@@ -112,6 +112,18 @@ export const umatService = {
   },
 
   /**
+   * Pendaftaran publik (`/daftar`): INSERT murni tanpa ON CONFLICT.
+   * Penting — `.upsert()` mengirim `ON CONFLICT (id) DO UPDATE`, dan klausa UPDATE
+   * itu membutuhkan izin UPDATE yang TIDAK dimiliki role anon (RLS hanya
+   * mengizinkan INSERT dengan is_pending = true) → permintaan ditolak 42501.
+   */
+  async insert(list: UmatRecord[]): Promise<void> {
+    if (!list || list.length === 0) return
+    const { error } = await supabase.from('umat').insert(list.map(toDb))
+    if (error) throw error
+  },
+
+  /**
    * Khusus pengiriman ulang antrean lokal (outbox): INSERT ... ON CONFLICT DO
    * NOTHING, jadi aman dipanggil berulang. Tidak menyentuh baris yang sudah ada
    * (RLS publik hanya mengizinkan INSERT, bukan UPDATE).

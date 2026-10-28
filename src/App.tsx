@@ -253,6 +253,17 @@ const sortUmatList = (list: UmatRecord[], sortBy: UmatSortOption): UmatRecord[] 
   return sorted;
 };
 
+// Supabase melempar objek PostgrestError ({ code, message }), bukan Error, jadi
+// String(err) saja menghasilkan "[object Object]" di catatan antrean lokal.
+const getErrorMessage = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  const candidate = err as { code?: string; message?: string } | null;
+  if (candidate && typeof candidate.message === 'string') {
+    return candidate.code ? `${candidate.code}: ${candidate.message}` : candidate.message;
+  }
+  return String(err);
+};
+
 interface PengurusRecord {
   id: string
   jabatan: string
@@ -769,7 +780,7 @@ function App() {
         } catch (err) {
           // Masih gagal (biasanya jaringan) → catat penyebabnya lalu berhenti;
           // percobaan berikutnya menunggu event online / jadwal retry berkala.
-          umatOutbox.markFailed(record.id, err instanceof Error ? err.message : String(err))
+          umatOutbox.markFailed(record.id, getErrorMessage(err))
           break
         }
       }
@@ -1201,7 +1212,9 @@ function App() {
     localStorage.setItem('imkksaSiteContent', JSON.stringify(newContent));
 
     try {
-      await umatService.upsert([pendingRecord]);
+      // INSERT murni (bukan upsert): RLS anonim hanya mengizinkan INSERT, sedangkan
+      // upsert mengirim ON CONFLICT DO UPDATE yang butuh izin UPDATE → ditolak 42501.
+      await umatService.insert([pendingRecord]);
       umatOutbox.remove(pendingRecord.id); // pastikan tidak ada sisa antrean dobel
       setUserSubmitMessage('Data berhasil dikirim! Menunggu verifikasi Admin.');
 
@@ -1210,7 +1223,7 @@ function App() {
     } catch (error) {
       // Supabase gagal (offline / server error) → data jangan sampai hilang:
       // masuk antrean lokal dan dikirim ulang otomatis saat koneksi pulih.
-      umatOutbox.enqueue(pendingRecord, error instanceof Error ? error.message : String(error))
+      umatOutbox.enqueue(pendingRecord, getErrorMessage(error))
       setUserSubmitMessage('Koneksi ke server sedang bermasalah. Data Bapak/Ibu sudah tersimpan di perangkat ini dan akan dikirim otomatis saat koneksi pulih — tidak perlu mengisi ulang.');
     } finally {
       setIsSubmittingUserForm(false);
