@@ -571,7 +571,7 @@ function App() {
 
   // ── Banner pengumuman (bisa ditutup pengunjung per sesi) ────────────────
   const announcementText = siteContent.settings.announcementText || '';
-  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  const [dismissedAnnouncementText, setDismissedAnnouncementText] = useState<string | null>(null);
   const [birthdayMonth, setBirthdayMonth] = useState(() => new Date().getMonth());
   const birthdayNames = useMemo(() => siteContent.umat
     .filter(u =>
@@ -599,16 +599,8 @@ function App() {
     refreshAtNextMonth();
     return () => window.clearTimeout(timeoutId);
   }, []);
-  useEffect(() => {
-    // Muncul lagi kalau teks pengumumannya berubah (mis. admin mengganti isinya).
-    try {
-      setAnnouncementDismissed(sessionStorage.getItem('imkksa_announcement_closed') === announcementText);
-    } catch { /* sessionStorage tidak tersedia → selalu tampil */ }
-  }, [announcementText]);
-  const dismissAnnouncement = () => {
-    setAnnouncementDismissed(true);
-    try { sessionStorage.setItem('imkksa_announcement_closed', announcementText); } catch { /* abaikan */ }
-  };
+  // Penutupan hanya berlaku selama halaman ini terbuka; refresh akan menampilkan banner lagi.
+  const dismissAnnouncement = () => setDismissedAnnouncementText(announcementText);
 
   // ── Meta description dari A.Panel (SEO) ──────────────────────────────────
   useEffect(() => {
@@ -3242,7 +3234,7 @@ function App() {
           )}
         </ul>
       </nav>
-      {announcementText && !announcementDismissed && (
+      {announcementText && dismissedAnnouncementText !== announcementText && (
         <div className="announcement-bar">
           <div className="announcement-marquee">
             <div

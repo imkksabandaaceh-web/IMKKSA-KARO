@@ -11,3 +11,4 @@
 - Verifikasi kamera: build dan pemeriksaan RLS berhasil. Uji kamera fisik/browser perlu dilakukan di situs HTTPS dengan izin kamera perangkat.
 - Banner ulang tahun dibuat bergerak dari kanan ke kiri, menampilkan semua nama anggota terverifikasi yang ulang tahun pada bulan berjalan, dan rekap data anggota publik diperbarui berkala tiap 60 detik saat situs terlihat.
 - Verifikasi banner ulang tahun: build dan pemeriksaan RLS berhasil; tanggal lahir invalid/kosong diabaikan.
+- Memperbaiki tombol tutup banner pengumuman: penutupan kini hanya berlaku sampai halaman di-refresh; setelah refresh, banner dari A.Panel tampil kembali.
