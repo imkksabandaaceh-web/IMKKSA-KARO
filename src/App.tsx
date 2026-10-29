@@ -2240,18 +2240,18 @@ function App() {
                 value={userSearch} 
                 onChange={e => setUserSearch(e.target.value)} 
                 onKeyDown={e => { if (e.key === 'Enter') handleUserSearch(); }}
-                style={{ flex: 1, minWidth: '180px', padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                style={{ flex: 1, minWidth: '180px', padding: '12px', borderRadius: '8px', border: '1.5px solid #94a3b8', color: '#0f172a', background: '#ffffff' }} 
               />
               <button className="btn-save" onClick={handleUserSearch} style={{ padding: '0 30px' }}>CARI</button>
               <button
                 className="btn-save"
                 onClick={() => { setUserSearch(''); setUserSearchQuery(''); setUserShowAll(true); }}
-                style={{ padding: '0 20px', background: '#546e7a' }}
+                style={{ padding: '0 20px', background: '#475569', color: '#ffffff' }}
               >
                 TAMPILKAN SEMUA
               </button>
               {userHasQueried && (
-                <select value={userSortBy} onChange={e => setUserSortBy(e.target.value as UmatSortOption)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}>
+                <select value={userSortBy} onChange={e => setUserSortBy(e.target.value as UmatSortOption)} style={{ padding: '10px', borderRadius: '8px', border: '1.5px solid #94a3b8', color: '#0f172a', background: '#ffffff' }}>
                   <option value="nama-az">Nama (A-Z)</option>
                   <option value="nama-za">Nama (Z-A)</option>
                   <option value="tanggal-terbaru">Tanggal Input (Terbaru)</option>
@@ -2270,7 +2270,7 @@ function App() {
             </div>
 
             <div className="user-mandiri-cta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', marginBottom: '22px', padding: '16px 18px', background: '#f1f8ff', border: '1px solid #cfe3fb', borderRadius: '10px' }}>
-              <p style={{ margin: 0, color: '#334155', fontSize: '0.92rem' }}>
+              <p style={{ margin: 0, color: '#0f172a', fontSize: '0.95rem', fontWeight: 600 }}>
                 Nama Anda belum terdaftar? Silakan isi data secara mandiri untuk mendaftar.
               </p>
               <button
@@ -2331,7 +2331,7 @@ function App() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
+                        <td colSpan={3} style={{ textAlign: 'center', padding: '30px', color: '#475569', fontWeight: 500 }}>
                           {userHasQueried ? 'Data Anggota Tidak Ditemukan' : 'Klik "TAMPILKAN SEMUA" atau cari nama untuk melihat daftar anggota.'}
                         </td>
                       </tr>
@@ -2517,8 +2517,8 @@ function App() {
               </div>
             )}
 
-                                    {userSubmitMessage && (
-              <div style={{ marginTop: '25px', padding: '15px', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: '600', border: '1px solid #c8e6c9' }}>
+            {userSubmitMessage && (
+              <div style={{ marginTop: '25px', padding: '16px', backgroundColor: '#ecfdf5', color: '#065f46', borderRadius: '8px', textAlign: 'center', fontWeight: '600', border: '1px solid #a7f3d0' }}>
                 {userSubmitMessage}
               </div>
             )}

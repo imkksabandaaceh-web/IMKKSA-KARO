@@ -1141,11 +1141,13 @@ button {
   position: absolute;
   top: 15px;
   right: 15px;
-  background: #f0f0f0;
-  border: none;
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
   font-size: 1.2rem;
-  width: 32px;
-  height: 32px;
+  font-weight: 700;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -1155,7 +1157,8 @@ button {
   z-index: 10;
 }
 .modal-header-btn:hover {
-  background: #e0e0e0;
+  background: #e2e8f0;
+  color: #000000;
 }
 
 /* Official Form Layout (KOP Surat Style) */
@@ -1673,7 +1676,9 @@ button {
   width: min(720px, 96vw);
   padding: 34px 26px 26px;
   max-height: 94vh;
-  background: var(--surface-1, #f7f7f4);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
 .mandiri-card {
@@ -1691,30 +1696,33 @@ button {
   flex: 1;
   height: 8px;
   border-radius: 4px;
-  background: #d8d7d0;
+  background: #e2e8f0;
 }
 
-.mandiri-bar i.on { background: var(--secondary-color); }
+.mandiri-bar i.on {
+  background: var(--primary-color, #2e7d32);
+}
 
 .mandiri-stepcount {
-  font-size: 0.88rem;
-  color: #6b6b66;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
   margin: 0 0 10px;
 }
 
 .mandiri-q {
   font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.3;
+  font-weight: 700;
+  line-height: 1.35;
   margin: 0 0 8px;
-  color: var(--primary-color);
+  color: #0f172a;
 }
 
 .mandiri-h {
   font-size: 1rem;
-  color: #6b6b66;
-  margin: 0 0 16px;
-  line-height: 1.45;
+  color: #334155;
+  margin: 0 0 18px;
+  line-height: 1.5;
 }
 
 .mandiri-input {
@@ -1722,13 +1730,18 @@ button {
   height: 60px;
   font-size: 1.2rem;
   padding: 0 16px;
-  border: 1px solid #cfcec7;
+  border: 1.5px solid #94a3b8;
   border-radius: 10px;
-  background: #fff;
-  color: #1b1b19;
+  background: #ffffff;
+  color: #0f172a;
   box-sizing: border-box;
   font-family: inherit;
   margin-bottom: 10px;
+}
+
+.mandiri-input::placeholder {
+  color: #64748b;
+  opacity: 1;
 }
 
 .mandiri-textarea {
@@ -1741,8 +1754,8 @@ button {
 
 .mandiri-input:focus {
   outline: none;
-  border-color: var(--secondary-color);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  border-color: var(--primary-color, #2e7d32);
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.2);
 }
 
 .mandiri-upload {
@@ -1753,19 +1766,21 @@ button {
   gap: 8px;
   min-height: 130px;
   padding: 18px;
-  border: 2px dashed #c9c8c0;
+  border: 2px dashed #94a3b8;
   border-radius: 12px;
-  background: #fff;
+  background: #ffffff;
   text-align: center;
-  font-size: 1rem;
-  color: #52514e;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #0f172a;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .mandiri-upload:hover {
-  border-color: var(--secondary-color);
-  background: #fffdf6;
+  border-color: var(--primary-color, #2e7d32);
+  background: #f8fafc;
+  color: var(--primary-color, #2e7d32);
 }
 
 .mandiri-upload input[type="file"] { display: none; }
@@ -1796,26 +1811,28 @@ button {
   aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #cbd5e1;
 }
 
 .mandiri-sum {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   line-height: 1.6;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
   border-radius: 12px;
   padding: 16px 18px;
-  color: #1b1b19;
+  color: #0f172a;
   word-break: break-word;
 }
 
 .mandiri-sum b {
   display: block;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #6b6b66;
+  font-weight: 700;
+  color: #475569;
   margin-top: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .mandiri-sum b:first-child { margin-top: 0; }
@@ -1824,7 +1841,8 @@ button {
   min-height: 22px;
   margin: 10px 0 0;
   font-size: 0.95rem;
-  color: #b3261e;
+  font-weight: 600;
+  color: #dc2626;
 }
 
 .mandiri-nav {
@@ -1836,30 +1854,40 @@ button {
 .mandiri-btn {
   flex: 1;
   min-height: 58px;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
   border-radius: 10px;
   cursor: pointer;
   font-family: inherit;
-  transition: filter 0.15s, background 0.15s;
+  transition: filter 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .mandiri-btn-primary {
-  background: var(--secondary-color);
-  color: var(--primary-color);
+  /* Warna tombol aksi dibuat tetap gelap agar teks putih terbaca meski tema
+     admin memakai warna aksen terang seperti kuning. */
+  background: #166534;
+  color: #ffffff !important;
   border: none;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
-.mandiri-btn-primary:hover:not(:disabled) { filter: brightness(0.94); }
+.mandiri-btn-primary:hover:not(:disabled) {
+  filter: brightness(0.9);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
+}
 .mandiri-btn-primary:disabled { opacity: 0.6; cursor: progress; }
 
 .mandiri-btn-secondary {
-  background: #fff;
-  color: #383835;
-  border: 1px solid #cfcec7;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1.5px solid #94a3b8;
 }
 
-.mandiri-btn-secondary:hover { background: #f4f4f0; }
+.mandiri-btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #64748b;
+}
 
 @media (max-width: 640px) {
   .modal-content.mandiri-form {
