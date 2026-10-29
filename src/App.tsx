@@ -1942,6 +1942,7 @@ function App() {
                   <select value={umatForm.status} onChange={e => setUmatForm({ ...umatForm, status: e.target.value })}>
                     <option value="Anggota">Anggota</option>
                     <option value="Pengurus">Pengurus</option>
+                    <option value="Penasihat">Penasihat</option>
                     <option value="Non Aktif">Non Aktif</option>
                   </select>
                 </div>
