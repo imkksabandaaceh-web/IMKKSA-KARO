@@ -2,7 +2,6 @@
 // Generate PDF proposal: isi form field di COVER.pdf (nomor, tanggal, tujuan),
 // gabung dengan halaman ISI.pdf, flatten, lalu kembalikan bytes siap unduh.
 import { PDFDocument, PDFForm, PDFTextField } from 'pdf-lib'
-import fontkit from '@pdf-lib/fontkit'
 
 export interface ProposalPdfData {
   nomorSurat: string
@@ -97,8 +96,6 @@ export async function generateProposalPdf(data: ProposalPdfData): Promise<Uint8A
   coverForm.flatten()
 
   const out = await PDFDocument.create()
-  out.registerFontkit(fontkit)
-
   // Gabung: halaman cover (sudah terisi) dulu, lalu halaman isi
   const coverPages = await out.copyPages(cover, cover.getPageIndices())
   coverPages.forEach((p) => out.addPage(p))
