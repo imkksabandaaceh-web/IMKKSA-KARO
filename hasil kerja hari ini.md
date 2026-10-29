@@ -9,3 +9,5 @@
 - Commit `51b5faf` (`perf: reduce proposal PDF bundle size`) sudah di-push ke `origin/master`; branch bersih dan tersinkron.
 - Form pas foto kini meminta izin kamera browser secara langsung (`getUserMedia`), menampilkan pratinjau, mengambil foto lalu memakai alur kompresi/unggah yang sama; stream kamera dihentikan saat foto diambil, modal ditutup, atau komponen dilepas. Pilihan galeri tetap tersedia.
 - Verifikasi kamera: build dan pemeriksaan RLS berhasil. Uji kamera fisik/browser perlu dilakukan di situs HTTPS dengan izin kamera perangkat.
+- Banner ulang tahun dibuat bergerak dari kanan ke kiri, menampilkan semua nama anggota terverifikasi yang ulang tahun pada bulan berjalan, dan rekap data anggota publik diperbarui berkala tiap 60 detik saat situs terlihat.
+- Verifikasi banner ulang tahun: build dan pemeriksaan RLS berhasil; tanggal lahir invalid/kosong diabaikan.

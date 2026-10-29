@@ -16,6 +16,7 @@ import type { FileFolder } from './components/BerkasView'
 // Jumlah salinan teks di banner pengumuman supaya animasi marquee tetap
 // penuh (tidak ada ruang kosong) di layar lebar sekalipun.
 const ANNOUNCEMENT_MARQUEE_COPIES = 8;
+const BIRTHDAY_MARQUEE_COPIES = 8;
 const ANNOUNCEMENT_DEFAULT_BG = '#0d1a13';
 
 // Langkah formulir pendataan mandiri (pengunjung non-admin).
@@ -26,6 +27,22 @@ const MANDIRI_STEPS = ['Nama', 'No. HP', 'Kelahiran', 'Alamat', 'Dokumen', 'Ring
 const getAnnouncementDuration = (value?: string): string => {
   const seconds = Number(value);
   return `${Number.isFinite(seconds) && seconds >= 5 && seconds <= 120 ? seconds : 20}s`;
+};
+
+const getBirthMonthIndex = (value?: string): number | null => {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() !== Number(month) - 1 ||
+    date.getUTCDate() !== Number(day)
+  ) return null;
+
+  return Number(month) - 1;
 };
 
 // Warna teks banner dipilih otomatis (gelap/terang) berdasarkan kecerahan
@@ -555,6 +572,33 @@ function App() {
   // ── Banner pengumuman (bisa ditutup pengunjung per sesi) ────────────────
   const announcementText = siteContent.settings.announcementText || '';
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  const [birthdayMonth, setBirthdayMonth] = useState(() => new Date().getMonth());
+  const birthdayNames = useMemo(() => siteContent.umat
+    .filter(u =>
+      !u.isPending &&
+      ['Anggota', 'Pengurus', 'Penasihat'].includes(u.status) &&
+      getBirthMonthIndex(u.tanggalLahir) === birthdayMonth
+    )
+    .map(u => u.nama.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'id')),
+  [siteContent.umat, birthdayMonth]);
+  const birthdayMonthName = new Intl.DateTimeFormat('id-ID', { month: 'long' })
+    .format(new Date(new Date().getFullYear(), birthdayMonth, 1));
+
+  useEffect(() => {
+    let timeoutId: number;
+    const refreshAtNextMonth = () => {
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      timeoutId = window.setTimeout(() => {
+        setBirthdayMonth(new Date().getMonth());
+        refreshAtNextMonth();
+      }, nextMonth.getTime() - now.getTime() + 100);
+    };
+    refreshAtNextMonth();
+    return () => window.clearTimeout(timeoutId);
+  }, []);
   useEffect(() => {
     // Muncul lagi kalau teks pengumumannya berubah (mis. admin mengganti isinya).
     try {
@@ -845,8 +889,9 @@ function App() {
     const startPolling = () => {
       if (intervalId !== null) return
       intervalId = setInterval(() => {
-        if (document.visibilityState === 'visible' && isLoggedInRef.current) {
-          fetchData(true)
+        if (document.visibilityState === 'visible') {
+          loadUmat({ silent: true })
+          if (isLoggedInRef.current) fetchData(true)
         }
       }, POLL_INTERVAL_MS)
     }
@@ -3212,6 +3257,22 @@ function App() {
             </div>
           </div>
           <button className="announcement-close" onClick={dismissAnnouncement} aria-label="Tutup pengumuman">✕</button>
+        </div>
+      )}
+      {birthdayNames.length > 0 && (
+        <div className="birthday-announcement" role="status" aria-live="polite">
+          <div className="birthday-announcement-viewport">
+            <div
+              className="birthday-announcement-track"
+              style={{ '--birthday-copies': BIRTHDAY_MARQUEE_COPIES } as React.CSSProperties}
+            >
+              {Array.from({ length: BIRTHDAY_MARQUEE_COPIES }, (_, i) => (
+                <span key={i} className="birthday-announcement-text" aria-hidden={i > 0}>
+                  🎈🎂 HAPPY BIRTHDAY di Bulan {birthdayMonthName} kepada: {birthdayNames.join(', ')} 🎂🎈
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
       <main className="main-content">

@@ -715,6 +715,62 @@ button {
   background: rgba(127, 127, 127, 0.45);
 }
 
+.birthday-announcement {
+  overflow: hidden;
+  padding: 11px 0;
+  background: linear-gradient(90deg, #fff3cd, #ffe0b2, #fff3cd);
+  color: #7c2d12;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid #fed7aa;
+}
+
+.birthday-announcement-viewport {
+  overflow: hidden;
+  width: 100%;
+}
+
+.birthday-announcement-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: birthdayAnnouncementScroll 32s linear infinite;
+}
+
+.birthday-announcement:hover .birthday-announcement-track {
+  animation-play-state: paused;
+}
+
+.birthday-announcement-text {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding-right: 64px;
+}
+
+@keyframes birthdayAnnouncementScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% / var(--birthday-copies, 8))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .birthday-announcement-track {
+    animation: none;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .birthday-announcement-text {
+    padding-right: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .birthday-announcement-text:nth-child(n + 2) {
+    display: none;
+  }
+}
+
 /* ADMIN DASHBOARD SPECIFIC */
 .admin-dashboard {
   background-color: #f1f3f4;
