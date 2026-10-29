@@ -1766,6 +1766,11 @@ button {
 .mandiri-upload {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: normal;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -1789,7 +1794,77 @@ button {
 }
 
 .mandiri-upload input[type="file"] { display: none; }
+.mandiri-upload:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 .mandiri-upload-icon { font-size: 2rem; line-height: 1; }
+
+.camera-modal-overlay {
+  z-index: 2100;
+  align-items: center;
+  padding: 20px;
+}
+
+.camera-modal {
+  width: min(92vw, 560px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.camera-modal-header,
+.camera-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.camera-modal-header {
+  margin-bottom: 14px;
+}
+
+.camera-modal-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.camera-modal-header button {
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.camera-preview {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+.camera-error {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.camera-modal-actions {
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.camera-modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 /* Dua pilihan sumber pas foto: kamera langsung atau galeri HP */
 .mandiri-upload-choices {

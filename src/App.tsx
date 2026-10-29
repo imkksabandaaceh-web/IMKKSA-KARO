@@ -491,6 +491,19 @@ function App() {
   const [selectedUmat, setSelectedUmat] = useState<UmatRecord | null>(null)
   // Field foto/KK yang sedang diunggah ke Google Drive (form admin atau publik)
   const [uploadingField, setUploadingField] = useState<null | { form: 'admin' | 'user'; field: 'photo' | 'kk' }>(null)
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
+  const [cameraForm, setCameraForm] = useState<'admin' | 'user' | null>(null)
+  const [cameraStarting, setCameraStarting] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
+  const cameraRequestIdRef = useRef(0)
+
+  useEffect(() => () => {
+    cameraRequestIdRef.current++
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop())
+    cameraStreamRef.current = null
+  }, [])
 
   // Link pendek pendaftaran mandiri: /daftar (atau /#daftar) langsung membuka
   // formulir satu-pertanyaan-per-layar tanpa perlu mencari nama lebih dulu.
@@ -1787,12 +1800,10 @@ function App() {
   // Simpan ditekan). Form hanya menyimpan URL-nya, sehingga payload simpan kecil,
   // cepat, dan tidak lagi mengirim base64 besar lewat Apps Script (mencegah
   // timeout 6 menit & melebihi batas Script Properties 500KB).
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'kk', isAdmin = true) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadImageFile = async (file: File, field: 'photo' | 'kk', isAdmin: boolean, input?: HTMLInputElement) => {
     if (file.size > 5 * 1024 * 1024) {
       alert("Ukuran file tidak boleh lebih dari 5 MB");
-      e.target.value = '';
+      if (input) input.value = '';
       return;
     }
 
@@ -1819,9 +1830,113 @@ function App() {
       alert(`Gagal mengunggah ${label} ke Google Drive: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setUploadingField(null);
-      e.target.value = '';
+      if (input) input.value = '';
     }
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo' | 'kk', isAdmin = true) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    if (file) void uploadImageFile(file, field, isAdmin, input);
+  }
+
+  const stopCamera = () => {
+    cameraRequestIdRef.current++;
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
+    setIsCameraOpen(false);
+    setCameraStarting(false);
+    setCameraError(null);
+  }
+
+  const startCamera = async (isAdmin: boolean) => {
+    if (cameraStarting) return;
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+    cameraStreamRef.current = null;
+    setCameraForm(isAdmin ? 'admin' : 'user');
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia || !window.isSecureContext) {
+      setCameraError('Kamera langsung memerlukan browser yang mendukung kamera dan koneksi aman HTTPS. Silakan gunakan pilihan galeri.');
+      return;
+    }
+
+    const requestId = ++cameraRequestIdRef.current;
+    setCameraStarting(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'user' } },
+      });
+      if (requestId !== cameraRequestIdRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      cameraStreamRef.current = stream;
+      setCameraError(null);
+      setIsCameraOpen(true);
+    } catch (err) {
+      if (requestId !== cameraRequestIdRef.current) return;
+      const name = err instanceof DOMException ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setCameraError('Izin kamera ditolak. Izinkan akses kamera untuk situs ini di pengaturan browser, lalu coba lagi.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setCameraError('Kamera tidak ditemukan pada perangkat ini. Silakan gunakan pilihan galeri.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setCameraError('Kamera sedang digunakan aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.');
+      } else {
+        setCameraError(`Kamera tidak dapat dibuka: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } finally {
+      if (requestId === cameraRequestIdRef.current) setCameraStarting(false);
+    }
+  }
+
+  const captureCameraPhoto = () => {
+    const video = cameraVideoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError('Kamera belum siap. Tunggu sebentar, lalu coba lagi.');
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setCameraError('Gagal mengambil foto dari kamera. Silakan coba lagi atau gunakan galeri.');
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      if (!blob) {
+        setCameraError('Gagal memproses foto kamera. Silakan coba lagi.');
+        return;
+      }
+      const file = new File([blob], `pas-foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const isAdmin = cameraForm === 'admin';
+      stopCamera();
+      void uploadImageFile(file, 'photo', isAdmin);
+    }, 'image/jpeg', 0.9);
+  }
+
+  useEffect(() => {
+    if (!isCameraOpen || !cameraVideoRef.current || !cameraStreamRef.current) return;
+    const video = cameraVideoRef.current;
+    video.srcObject = cameraStreamRef.current;
+    void video.play().catch(() => {
+      setCameraError('Pratinjau kamera tidak dapat diputar. Periksa izin kamera lalu coba lagi.');
+    });
+  }, [isCameraOpen])
+
+  useEffect(() => {
+    if (!isCameraOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') stopCamera();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCameraOpen])
 
   const renderDataAnggota = () => {
     const pendingUmat = siteContent.umat.filter(u => u.isPending);
@@ -1966,28 +2081,29 @@ function App() {
                   <label>Upload Pas Foto (Opsional, Maksimal 5 MB):</label>
                   {/* Dua pilihan sumber foto, sama seperti form mandiri: kamera atau galeri HP */}
                   <div className="mandiri-upload-choices">
-                    <label className="mandiri-upload">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="user"
-                        onChange={(e) => handleFileChange(e, 'photo', true)}
-                        disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'photo'}
-                      />
+                    <button
+                      type="button"
+                      className="mandiri-upload"
+                      onClick={() => void startCamera(true)}
+                      disabled={cameraStarting || (uploadingField?.form === 'admin' && uploadingField?.field === 'photo')}
+                    >
                       <span className="mandiri-upload-icon">📷</span>
-                      <span>Ambil Foto (Kamera)</span>
-                    </label>
+                      <span>{cameraStarting && cameraForm === 'admin' ? 'Membuka kamera...' : 'Ambil Foto (Kamera)'}</span>
+                    </button>
                     <label className="mandiri-upload">
                       <input
                         type="file"
                         accept="image/*"
                         onChange={(e) => handleFileChange(e, 'photo', true)}
-                        disabled={uploadingField?.form === 'admin' && uploadingField?.field === 'photo'}
+                        disabled={cameraStarting || (uploadingField?.form === 'admin' && uploadingField?.field === 'photo')}
                       />
                       <span className="mandiri-upload-icon">🖼️</span>
-                      <span>Pilih dari Galeri HP</span>
+                      <span>Ambil dari Galeri:</span>
                     </label>
                   </div>
+                  {cameraError && cameraForm === 'admin' && (
+                    <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem', margin: '8px 0' }}>{cameraError}</p>
+                  )}
                   {uploadingField?.form === 'admin' && uploadingField?.field === 'photo' && (
                     <div className="upload-status">⏳ Mengunggah pas foto ke Google Drive...</div>
                   )}
@@ -2427,28 +2543,29 @@ function App() {
                         <p className="mandiri-h">Foto otomatis dipotong ke ukuran 4x6 dan dikompres. Pilih dari galeri HP bila fotonya sudah ada.</p>
                         {/* Dua pilihan sumber foto: kamera langsung, atau foto yang sudah ada di galeri HP */}
                         <div className="mandiri-upload-choices">
-                          <label className="mandiri-upload">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="user"
-                              onChange={(e) => handleFileChange(e, 'photo', false)}
-                              disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
-                            />
+                          <button
+                            type="button"
+                            className="mandiri-upload"
+                            onClick={() => void startCamera(false)}
+                            disabled={cameraStarting || (uploadingField?.form === 'user' && uploadingField?.field === 'photo')}
+                          >
                             <span className="mandiri-upload-icon">📷</span>
-                            <span>Ambil Foto (Kamera)</span>
-                          </label>
+                            <span>{cameraStarting && cameraForm === 'user' ? 'Membuka kamera...' : 'Ambil Foto (Kamera)'}</span>
+                          </button>
                           <label className="mandiri-upload">
                             <input
                               type="file"
                               accept="image/*"
                               onChange={(e) => handleFileChange(e, 'photo', false)}
-                              disabled={uploadingField?.form === 'user' && uploadingField?.field === 'photo'}
+                              disabled={cameraStarting || (uploadingField?.form === 'user' && uploadingField?.field === 'photo')}
                             />
                             <span className="mandiri-upload-icon">🖼️</span>
-                            <span>Pilih dari Galeri HP</span>
+                            <span>Ambil dari Galeri:</span>
                           </label>
                         </div>
+                        {cameraError && cameraForm === 'user' && (
+                          <p role="alert" className="mandiri-h" style={{ color: '#b91c1c' }}>{cameraError}</p>
+                        )}
                         {userUmatForm.photo && !uploadingField && (
                           <p className="mandiri-h">Pas foto sudah ada — tekan salah satu pilihan di atas untuk menggantinya.</p>
                         )}
@@ -3113,6 +3230,28 @@ function App() {
         )}
       </footer>
       {renderFormulirPendaftaranModal()}
+      {isCameraOpen && (
+        <div className="modal-overlay camera-modal-overlay" onClick={stopCamera}>
+          <div
+            className="camera-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="camera-modal-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="camera-modal-header">
+              <h2 id="camera-modal-title">Ambil Pas Foto</h2>
+              <button type="button" onClick={stopCamera} aria-label="Tutup kamera">✕</button>
+            </div>
+            <video ref={cameraVideoRef} autoPlay playsInline muted className="camera-preview" onLoadedMetadata={() => setCameraError(null)} />
+            {cameraError && <p role="alert" className="camera-error">{cameraError}</p>}
+            <div className="camera-modal-actions">
+              <button type="button" className="btn-cancel" onClick={stopCamera}>Batal</button>
+              <button type="button" className="btn-save" onClick={captureCameraPhoto} disabled={!!cameraError || cameraStarting}>Ambil Foto</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Musik latar — dimuat on-demand, tidak memblokir rendering */}
       <BackgroundMusic />
